@@ -1,0 +1,83 @@
+{
+  "_说明": [
+    "task-activator.py 的激活器样例：3 条任务 + 2 条决策，内容全部虚构，仅示意字段与状态流转。",
+    "用法：ACTIVATOR_JSON=examples/task-activator.sample.json python3 scripts/task-activator.py list",
+    "三个相位由 status 决定：待开工 / 施工中 / 已完成。",
+    "decisions 里未答的问题会把它 tasks 里的任务挡在待开工——这是「请示不清不开工」的机制化。",
+    "owner 为空时脚本会拦截：舰长不能把任务留给自己（见 task-activator.py 的舰长钩子）。"
+  ],
+  "tasks": [
+    {
+      "id": "T-1001",
+      "title": "样例：给导入器加入参格式校验，非法整批不导",
+      "status": "已完成",
+      "owner": "舰员甲",
+      "book": "${FLEET_HOME}/tasks/T-1001-任务书.md",
+      "receipt": "${FLEET_HOME}/receipts/T-1001-回执.md",
+      "worktree": "${FLEET_HOME}/worktrees/t1001",
+      "blocker": "",
+      "note": "反例三条（非数字/超长/过短）均 exit 1 且零写入；复审 PASS",
+      "created": "<日期> 09:10",
+      "updated": "<日期> 15:42",
+      "history": [
+        ["<日期> 09:10", "待开工", "add"],
+        ["<日期> 09:35", "施工中", "派单 舰员甲"],
+        ["<日期> 15:42", "已完成", "复审 PASS"]
+      ]
+    },
+    {
+      "id": "T-1002",
+      "title": "样例：完成确认必须由另一人签字，同人即拒",
+      "status": "施工中",
+      "owner": "舰员乙",
+      "book": "${FLEET_HOME}/tasks/T-1002-任务书.md",
+      "receipt": "",
+      "worktree": "${FLEET_HOME}/worktrees/t1002",
+      "blocker": "",
+      "note": "判据已加，正在补反例：去掉判据必须红在该红那条",
+      "created": "<日期> 10:00",
+      "updated": "<日期> 11:20",
+      "history": [
+        ["<日期> 10:00", "待开工", "add"],
+        ["<日期> 10:15", "待开工", "Q-201 未答→挡住"],
+        ["<日期> 11:20", "施工中", "Q-201 已答→可开工"]
+      ]
+    },
+    {
+      "id": "T-1003",
+      "title": "样例：一次性演练库的收尾三件套自动化",
+      "status": "待开工",
+      "owner": "舰员丙",
+      "book": "${FLEET_HOME}/tasks/T-1003-任务书.md",
+      "receipt": "",
+      "worktree": "",
+      "blocker": "等 Q-202 拍板：清理策略按名精确删还是按前缀批删",
+      "note": "",
+      "created": "<日期> 08:00",
+      "updated": "<日期> 08:00",
+      "history": [
+        ["<日期> 08:00", "待开工", "add"]
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "qid": "Q-201",
+      "question": "样例：完成确认的『另一人』按账号判还是按自然人判？A=按账号（同一人两个账号视为两人）B=按自然人（需要人员主数据支持）",
+      "tasks": ["T-1002"],
+      "who": "Owner",
+      "answer": "A",
+      "asked_at": "<日期> 10:15",
+      "answered_at": "<日期> 11:20"
+    },
+    {
+      "qid": "Q-202",
+      "question": "样例：一次性库清理用按名精确删还是按前缀批删？A=按名精确删（漏删靠清单回查兜底）B=按前缀批删（快，但会误删他人同前缀库）",
+      "tasks": ["T-1003"],
+      "who": "Owner",
+      "answer": "",
+      "asked_at": "<日期> 08:00",
+      "answered_at": ""
+    }
+  ]
+}

@@ -1,0 +1,239 @@
+{
+  "version": "v1",
+  "flow": "premerge-gate",
+  "input_vars": [
+    "worktree",
+    "branch",
+    "head"
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "seq": 1,
+      "kind": "git",
+      "comment": "查询 worktree 当前所在分支名(branch)，供绑定归因和一致性核对使用",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse --abbrev-ref HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n2",
+      "seq": 2,
+      "kind": "git",
+      "comment": "查询 worktree 当前 HEAD commit sha(head)，供绑定归因和一致性核对使用",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^head=[0-9a-f]{40}$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n3",
+      "seq": 3,
+      "kind": "git",
+      "comment": "判决点g1(树干净)：git status --porcelain 统计已跟踪脏改动(tracked_dirty)/未跟踪(untracked)/冲突(conflict)行数——conflict>0(冲突码 UU/AA/DD/AU/UA/UD/DU)或 tracked_dirty>0(非'??'的已跟踪脏改动) -> FAIL，否则(仅'??'或空) -> PASS。digest 按约定1携带 point=g1/verdict= 字段，判决点与步骤的关联由数据自动定位",
+      "stability": "15/15",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "git --no-optional-locks -C {worktree} status --porcelain",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "g1",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n4",
+      "seq": 4,
+      "kind": "git",
+      "comment": "查询该 worktree 对应的 git 目录路径(git_dir)，供 seq5 中态标记检查拼接标记文件路径使用",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse --git-dir",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n5",
+      "seq": 5,
+      "kind": "logic",
+      "comment": "判决点g2(git中态)：检查 CHERRY_PICK_HEAD/MERGE_HEAD/REBASE_HEAD/BISECT_LOG/rebase-merge/rebase-apply 任一标记文件是否存在于 git-dir 下，任一存在 -> FAIL，全部不存在 -> PASS。digest 按约定1携带 point=g2/verdict= 字段",
+      "stability": "5/15",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "test -e .git/CHERRY_PICK_HEAD; test -e .git/MERGE_HEAD; test -e .git/REBASE_HEAD; test -e .git/BISECT_LOG; test -e .git/rebase-merge; test -e .git/rebase-apply",
+      "bindings": {},
+      "output_contract": "nonempty",
+      "verdict_point": "g2",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n6",
+      "seq": 6,
+      "kind": "git",
+      "comment": "判决点g3(冲突标记)：git grep 冲突标记(^<<<<<<<|^>>>>>>>|^=======)有命中 -> FAIL，无命中 -> PASS。digest 按约定1携带 point=g3/verdict= 字段",
+      "stability": "15/15",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "git --no-optional-locks -C {worktree} grep -l -E \"^(<<<<<<<|>>>>>>>|=======)$\" -- . | head -20",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "g3",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n7",
+      "seq": 7,
+      "kind": "git",
+      "comment": "相对 feat/<项目>-integration 取该 worktree HEAD 的合并基点(merge_base)，供 seq8 改动清单计算使用",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} merge-base feat/<项目>-integration HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^merge_base=[0-9a-f]{40}$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n8",
+      "seq": 8,
+      "kind": "git",
+      "comment": "相对 merge-base 用 git diff --name-only 取改动文件清单及计数(changed_files)，供 seq9 逐文件行尾检查的列表来源",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} -c core.quotepath=false diff --name-only {sha} HEAD",
+      "bindings": {
+        "sha": {
+          "from": "n7.output.merge_base"
+        },
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^changed_files=\\d+$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n9",
+      "seq": 9,
+      "kind": "git",
+      "comment": "判决点g4(行尾)：对 seq8 改动清单中的每个文件在 HEAD 下取内容，统计 CR(\\r) 出现次数，任一文件 CR>0 -> FAIL，全部为0 -> PASS。既是逐文件循环的 map 节点，其自身聚合结果(digest 里 point=g4/verdict= 字段)同时就是g4的机械判决来源，与 changeset-audit 把'循环(seq13)'和'聚合判决(seq14)'拆成两个独立步骤不同",
+      "stability": "15/15",
+      "type": "map",
+      "cmd_template": "for f in <changed_files>; do git --no-optional-locks -C {worktree} show HEAD:\"$f\" | LC_ALL=C /usr/bin/grep -c $'\\r' || true; done  # 逐文件, 上限200",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "list_binding": {
+        "from": "n8.output"
+      },
+      "output_contract": "nonempty",
+      "on_fail": "fallback",
+      "depends_on": [
+        "n8"
+      ],
+      "verdict_point": "g4",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    }
+  ],
+  "verdict_rules": [
+    {
+      "point": "g1",
+      "depends_on": [
+        "n3"
+      ],
+      "decision_node": "n3",
+      "stability": "15/15",
+      "type": "mechanical",
+      "comment": "g1 完全由 n3 的输出机械决定，15 轮观测 15/15 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "g2",
+      "depends_on": [
+        "n5"
+      ],
+      "decision_node": "n5",
+      "stability": "5/15",
+      "type": "mechanical",
+      "comment": "g2 完全由 n5 的输出机械决定，15 轮观测 5/15 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "g3",
+      "depends_on": [
+        "n6"
+      ],
+      "decision_node": "n6",
+      "stability": "15/15",
+      "type": "mechanical",
+      "comment": "g3 完全由 n6 的输出机械决定，15 轮观测 15/15 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "g4",
+      "depends_on": [
+        "n8",
+        "n9"
+      ],
+      "decision_node": "n9",
+      "stability": "15/15",
+      "type": "mechanical",
+      "comment": "g4 完全由 n9 的输出机械决定，15 轮观测 15/15 一致，无反例，无需模型介入。"
+    }
+  ],
+  "fallback": {
+    "action": "spawn_model",
+    "context": [
+      "run_history",
+      "current_node",
+      "matched_trajectory_ref"
+    ]
+  }
+}

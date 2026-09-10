@@ -1,0 +1,219 @@
+{
+  "version": "v1",
+  "flow": "cleanup-audit",
+  "input_vars": [
+    "scope",
+    "mutation",
+    "prefix_re",
+    "port_lo",
+    "port_hi",
+    "backlog_threshold",
+    "stale_days",
+    "runtime_hours",
+    "worktree_root",
+    "port_exempt"
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "seq": 1,
+      "kind": "logic",
+      "comment": "环境铺垫/观测记录(非判决步骤)：本轮实际执行的环境操作叙述(input.mutation 字段)，18轮内容各不相同(建库/建账号/起停端口进程/纯观测)，是采集时为了可复现而记录的fixture 铺垫动作，不是'收尾体检'本身的判决步骤——真正的5个判决点(c1-c5)在下面n2-n6。生产复放时本节点按 NO-OP 处理，不执行任何命令",
+      "stability": "1/18",
+      "type": "tool",
+      "cmd_template": "drill self-check baseline, no changes (observation 1)",
+      "bindings": {},
+      "output_contract": "nonempty",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n2",
+      "seq": 2,
+      "kind": "sql",
+      "comment": "判决点c1(临时库残留)：库名匹配 prefix_re 且无活跃会话(active_sessions=0)且实际滞留天数 > stale_days -> FAIL，否则(不匹配/有活跃会话/未超期) -> PASS。告警须带三要素：活跃连接数(active_sessions)/实际滞留天数(actual_stale_days)/反查出的配对授权账号(paired_grant_account，来自本节点自身第二段 mysql.db 查询，无需额外查询)。stale_days 参数化：自检模式用严阈值(如2天甚至0天)快速取得FAIL态，巡检模式可放宽阈值扫描全局积压",
+      "stability": "12/18",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "/usr/local/bin/docker exec ${DB_CONTAINER} sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 -N -e \"SELECT s.SCHEMA_NAME, (SELECT MIN(t.CREATE_TIME) FROM information_schema.TABLES t WHERE t.TABLE_SCHEMA = s.SCHEMA_NAME) AS min_create, (SELECT COUNT(*) FROM information_schema.PROCESSLIST p WHERE p.DB = s.SCHEMA_NAME) AS active_sessions FROM information_schema.SCHEMATA s WHERE s.SCHEMA_NAME REGEXP \\\"^({prefix_re})_\\\"; SELECT \\\"__GRANTS__\\\"; SELECT Db,User FROM mysql.db WHERE Db REGEXP \\\"^({prefix_re})_\\\"\"'",
+      "bindings": {
+        "prefix_re": {
+          "from": "input.prefix_re"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "c1",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n3",
+      "seq": 3,
+      "kind": "sql",
+      "comment": "判决点c2(临时账号残留)：账号名匹配 prefix_re 且(全部授权指向的库都不存在 或 无任何授权) -> FAIL；至少一个授权库存在(在用) -> PASS",
+      "stability": "18/18",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "/usr/local/bin/docker exec ${DB_CONTAINER} sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 -N -e \"SELECT user,host FROM mysql.user WHERE user REGEXP \\\"^({prefix_re})_\\\"; SELECT \\\"__GRANTS__\\\"; SELECT Db,User FROM mysql.db WHERE User REGEXP \\\"^({prefix_re})_\\\"; SELECT \\\"__SCHEMATA__\\\"; SELECT SCHEMA_NAME FROM information_schema.SCHEMATA\"'",
+      "bindings": {
+        "prefix_re": {
+          "from": "input.prefix_re",
+          "ambiguous_candidates": [
+            "input.prefix_re",
+            "n2.output.prefix_re"
+          ]
+        }
+      },
+      "output_contract": "nonempty",
+      "depends_on": [
+        "n2"
+      ],
+      "verdict_point": "c2",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n4",
+      "seq": 4,
+      "kind": "sql",
+      "comment": "判决点c3(僵尸授权)：mysql.db 授权(Db,User)指向的库在 information_schema.SCHEMATA 里不存在 -> 该条授权判为僵尸 -> FAIL。全局扫描、不按 prefix_re 过滤(僵尸授权对任何库都是风险，不限于自建前缀)；digest 里的 scope= 字段只回显当前prefix_re 输入作审计留痕，不是过滤条件",
+      "stability": "18/18",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "/usr/local/bin/docker exec ${DB_CONTAINER} sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 -N -e \"SELECT Db,User FROM mysql.db; SELECT \\\"__SCHEMATA__\\\"; SELECT SCHEMA_NAME FROM information_schema.SCHEMATA\"'",
+      "bindings": {},
+      "output_contract": "nonempty",
+      "verdict_point": "c3",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n5",
+      "seq": 5,
+      "kind": "shell",
+      "comment": "判决点c4(隔离实例残留)：监听端口落在 port_lo-port_hi 段 且 运行时长 > runtime_hours，且先过豁免名单(${PORT_APP}/${PORT_WEB}/8793/8794/${PORT_PANEL}/8777 永不入判，命中即跳过、不论运行时长多长) -> FAIL。告警须带三要素：端口/进程名/运行时长。port_lo/port_hi 支持单区间(巡检收窄验证用)或并行多区间(生产 java 段+node 段并行)",
+      "stability": "18/18",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "lsof -nP -iTCP -sTCP:LISTEN",
+      "bindings": {},
+      "output_contract": "nonempty",
+      "verdict_point": "c4",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n6",
+      "seq": 6,
+      "kind": "git",
+      "comment": "判决点c5(worktree积压)：相对 feat/<项目>-integration 零diff的可回收 worktree 数 >= backlog_threshold -> FAIL，否则 PASS。backlog_threshold 参数化：自检模式放宽阈值可验证通过态(生产真实积压数不会因验证而被误判)，巡检模式用生产实际阈值",
+      "stability": "18/18",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "br_list=$(git --no-optional-locks -C {worktree_root} worktree list --porcelain | awk '/^branch /{{sub(\"refs/heads/\",\"\",$2); print $2}}'); total=0; recl=0; for br in $br_list; do mb=$(git --no-optional-locks -C {worktree_root} merge-base \"$br\" feat/<项目>-integration 2>/dev/null); if [ -z \"$mb\" ]; then continue; fi; total=$((total+1)); cnt=$(git --no-optional-locks -C {worktree_root} diff --name-only \"$mb\" \"$br\" 2>/dev/null | wc -l | tr -d ' '); if [ \"$cnt\" = \"0\" ]; then recl=$((recl+1)); fi; done; echo \"total=$total reclaimable=$recl\"",
+      "bindings": {
+        "worktree_root": {
+          "from": "input.worktree_root"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "c5",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    }
+  ],
+  "verdict_rules": [
+    {
+      "point": "c1",
+      "depends_on": [
+        "n2"
+      ],
+      "decision_node": "n2",
+      "stability": "12/18",
+      "type": "mechanical",
+      "comment": "c1 完全由 n2 的输出机械决定，18 轮观测 12/18 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "c2",
+      "depends_on": [
+        "n2",
+        "n3"
+      ],
+      "decision_node": "n3",
+      "stability": "18/18",
+      "type": "mechanical",
+      "comment": "c2 完全由 n3 的输出机械决定，18 轮观测 18/18 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "c3",
+      "depends_on": [
+        "n4"
+      ],
+      "decision_node": "n4",
+      "stability": "18/18",
+      "type": "mechanical",
+      "comment": "c3 完全由 n4 的输出机械决定，18 轮观测 18/18 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "c4",
+      "depends_on": [
+        "n5"
+      ],
+      "decision_node": "n5",
+      "stability": "18/18",
+      "type": "mechanical",
+      "comment": "c4 完全由 n5 的输出机械决定，18 轮观测 18/18 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "c5",
+      "depends_on": [
+        "n6"
+      ],
+      "decision_node": "n6",
+      "stability": "18/18",
+      "type": "mechanical",
+      "comment": "c5 完全由 n6 的输出机械决定，18 轮观测 18/18 一致，无反例，无需模型介入。"
+    }
+  ],
+  "fallback": {
+    "action": "spawn_model",
+    "context": [
+      "run_history",
+      "current_node",
+      "matched_trajectory_ref"
+    ]
+  },
+  "revision_log": [
+    {
+      "rev": "v1",
+      "date": "<日期>",
+      "by": "通用化归纳器(inducer/induce.py 通用引擎)自动产出",
+      "changes": "对 cleanup-audit 当前18轮轨迹(6步/轮：1个环境铺垫步骤 + c1-c5五个判决步骤)归纳产出。这是第一个从采集起就全程遵守 TRAJECTORY-CONTRACT.md 全部约定的流程：判决步骤 digest 全带 point=/verdict= 字段(约定1)，c1-c5 全部由classify_point_role_by_digest_convention 自动定位，无需人工判决点映射表；阈值(stale_days/runtime_hours/backlog_threshold)全部参数化(约定7)，c1/c4各有真实 FAIL/PASS 两态反例(约定5)，c5 在 backlog_threshold=100 时观测到真实 PASS 态；UNRESOLVED 绑定 0，无 needs_review。运行器(runner/run_graph.py的 CleanupAuditRunner)fixture 验证额外发现并修复一个真实 bug：mysql.db.Db 列存的是 LIKE 模式，字面下划线会被 MySQL 转义(且 mysql 客户端输出时又将反斜杠再转义一次)，不还原会把几乎任何正常库名(如 ${DB_NAME})误判成僵尸授权/目标不存在，已在 unescape_mysql_db_pattern 中修复。"
+    }
+  ],
+  "conventions": {
+    "readonly": "本图全部判决步骤(c1-c5)对生产资源只读——docker exec mysql 只执行 SELECT，lsof/ps 只查系统状态，git worktree/merge-base/diff 只读枚举，均不执行任何写入/删除/授权变更。清理动作(DROP DATABASE/DROP USER/kill进程/worktree remove)不在本图范围内，需要人工或另一条流程在看到本图 FAIL 后决策执行",
+    "dual_mode": "同一张图靠输入参数支持两种用法：① 自检模式——prefix_re 限自建前缀(如本会话临时资源前缀)+ 严阈值(stale_days/runtime_hours 调小甚至为0)，会话收尾时自查有没有忘记清理；② 巡检模式——prefix_re 覆盖全部约定前缀(如 e2e|drill|tmp|test)+ 宽阈值，定期扫描全局积压。两种模式共用完全相同的判决逻辑，仅输入参数不同，不需要为巡检模式另开一张图",
+    "no_bare_grep": "存在性检查一律用 /usr/bin/grep 绝对路径或 Python 正则实现，正则禁用 \\w/\\d/\\s(本机交互 shell 的 grep 是 ugrep 函数包装，与 /bin/bash -c 子进程里的系统 grep 行为不一致)；git grep 是 git 子命令例外，不受影响",
+    "port_exempt": "c4 豁免名单：${PORT_APP}(ERP后端)/${PORT_WEB}(常驻前端)/8793/8794(<项目>MCP桥)/${PORT_PANEL}/8777(报告服务)——命中这些端口永不入判，不论运行时长多长；豁免判断先于运行时长阈值比较执行，即使 runtime_hours=0 这类最严阈值也不例外"
+  }
+}

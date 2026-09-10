@@ -1,0 +1,42 @@
+{
+ "ts": "<日期>T10:09:01.154282+00:00",
+ "key": {
+  "sequence": [
+   [
+    "b1",
+    "branch",
+    "OK"
+   ],
+   [
+    "b2",
+    "human_gate",
+    "SKIPPED_BY_GUARD"
+   ],
+   [
+    "b3",
+    "human_gate",
+    "SKIPPED_BY_GUARD"
+   ],
+   [
+    "b4",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b5",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b6",
+    "human_gate",
+    "HALTED_AT_HUMAN_GATE"
+   ]
+  ],
+  "emitted_tokens": [
+   "TEL_PROMPTED",
+   "VENDORED_GSTACK"
+  ],
+  "halted_at": "b6"
+ }
+}

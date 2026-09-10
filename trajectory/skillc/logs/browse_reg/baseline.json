@@ -1,0 +1,84 @@
+{
+ "ts": "<日期>T09:43:51.644318+00:00",
+ "key": {
+  "sequence": [
+   [
+    "b1",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b2",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b3",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b4",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b5",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b6",
+    "human_gate",
+    "SKIPPED_BY_GUARD"
+   ],
+   [
+    "b7",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b8",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b9",
+    "cmd",
+    "NOT_A_COMMAND"
+   ],
+   [
+    "b10",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b11",
+    "cmd",
+    "FAILED"
+   ],
+   [
+    "b12",
+    "cmd",
+    "OK"
+   ],
+   [
+    "b13",
+    "branch",
+    "OK"
+   ],
+   [
+    "b14",
+    "human_gate",
+    "SKIPPED_BY_GUARD"
+   ],
+   [
+    "b15",
+    "cmd",
+    "SKIPPED_BY_GUARD"
+   ]
+  ],
+  "emitted_tokens": [],
+  "halted_at": null
+ }
+}

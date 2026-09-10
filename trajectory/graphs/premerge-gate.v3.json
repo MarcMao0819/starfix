@@ -1,0 +1,287 @@
+{
+  "version": "v3",
+  "flow": "premerge-gate",
+  "input_vars": [
+    "worktree",
+    "branch",
+    "head"
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "seq": 1,
+      "kind": "git",
+      "comment": "查询 worktree 当前所在分支名(branch)，供绑定归因和一致性核对使用",
+      "stability": "23/23",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse --abbrev-ref HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n2",
+      "seq": 2,
+      "kind": "git",
+      "comment": "查询 worktree 当前 HEAD commit sha(head)，供绑定归因和一致性核对使用",
+      "stability": "23/23",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^head=[0-9a-f]{40}$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n3",
+      "seq": 3,
+      "kind": "git",
+      "comment": "判决点g1(树干净)：git status --porcelain 统计已跟踪脏改动(tracked_dirty)/未跟踪(untracked)/冲突(conflict)行数——conflict>0(冲突码 UU/AA/DD/AU/UA/UD/DU)或 tracked_dirty>0(非'??'的已跟踪脏改动) -> FAIL，否则(仅'??'或空) -> PASS。样本内23/23 全部PASS，FAIL分支从未被触发(见 needs_review)",
+      "stability": "23/23",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "git --no-optional-locks -C {worktree} status --porcelain",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^tracked_dirty=\\d+\\ untracked=\\d+\\ conflict=\\d+$",
+      "verdict_point": "g1",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "FAIL": "FAIL"
+      },
+      "no_match": "fallback",
+      "needs_review": true,
+      "reason": "判据来自流程定义而非数据归纳，FAIL分支未被样本验证: g1 在观测的 23 轮里全部 PASS，样本内zero个FAIL反例；FAIL 分支写入的判据(\"git status --porcelain 结果出现冲突码(UU/AA/DD/AU/UA/UD/DU)，或存在非'??'的已跟踪脏改动行\" -> FAIL)直接抄自任务给定的\"流程背景\"对 g1 的既定定义，不是从这 23 轮数据统计出来的规律，需要人工用真实 FAIL 样本核实。"
+    },
+    {
+      "id": "n4",
+      "seq": 4,
+      "kind": "git",
+      "comment": "查询该 worktree 对应的 git 目录路径(git_dir)，供 seq5 中态标记检查拼接标记文件路径使用",
+      "stability": "23/23",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse --git-dir",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n5",
+      "seq": 5,
+      "kind": "logic",
+      "comment": "判决点g2(git中态)：检查 CHERRY_PICK_HEAD/MERGE_HEAD/REBASE_HEAD/BISECT_LOG/rebase-merge/rebase-apply 任一标记文件是否存在于 git-dir 下，任一存在 -> FAIL，全部不存在 -> PASS。样本内23/23全部PASS，FAIL分支从未被触发(见 needs_review) [v3] 原 cmd_template 把标记文件路径硬编码成 <基座项目>-erp 的 linked-worktree 结构(${FLEET_INTEGRATION_REPO}/.git/worktrees/{worktree}/...)，只对该仓库的真实 worktree 成立；改用 seq4(n4) 实测的 git-dir 动态拼接({git_dir}/<marker>)，对任意仓库/worktree 都成立(普通仓库 git-dir 就是 <repo>/.git，linked worktree 则是 <主仓>/.git/worktrees/<name>)。<日期> 用自建病态仓库(P2 真实merge冲突)验证：命中 MERGE_HEAD 后正确判 FAIL。",
+      "stability": "22/23",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "test -e {git_dir}/CHERRY_PICK_HEAD; test -e {git_dir}/MERGE_HEAD; test -e {git_dir}/REBASE_HEAD; test -e {git_dir}/BISECT_LOG; test -e {git_dir}/rebase-merge; test -e {git_dir}/rebase-apply",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        },
+        "git_dir": {
+          "from": "n4.output.git_dir"
+        }
+      },
+      "output_contract": "regex:^markers_found=(none|[A-Za-z_]+(,[A-Za-z_]+)*)$",
+      "verdict_point": "g2",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "FAIL": "FAIL"
+      },
+      "no_match": "fallback",
+      "needs_review": true,
+      "reason": "判据来自流程定义而非数据归纳，FAIL分支未被样本验证: g2 在观测的 23 轮里全部 PASS，样本内zero个FAIL反例；FAIL 分支写入的判据(\"worktree 对应 git-dir 下 CHERRY_PICK_HEAD/MERGE_HEAD/REBASE_HEAD/BISECT_LOG/rebase-merge/rebase-apply 任一标记文件存在\" -> FAIL)直接抄自任务给定的\"流程背景\"对 g2 的既定定义，不是从这 23 轮数据统计出来的规律，需要人工用真实 FAIL 样本核实。"
+    },
+    {
+      "id": "n6",
+      "seq": 6,
+      "kind": "git",
+      "comment": "判决点g3(冲突标记)：git grep 冲突标记(^<<<<<<<|^>>>>>>>|^=======)有命中 -> FAIL，无命中 -> PASS。样本内23/23全部PASS，FAIL分支从未被触发(见 needs_review) [v2] 原 v1 的 depends_on:n2 是虚假依赖——命令末尾 `| head -20` 的 \"head\" 与 seq2 输出字段名 \"head\" 词法碰撞误判，已删。",
+      "stability": "23/23",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "git --no-optional-locks -C {worktree} grep -l -E \"^(<<<<<<<|>>>>>>>|=======)$\" -- . | head -20",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^conflict_files=\\d+$",
+      "verdict_point": "g3",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "FAIL": "FAIL"
+      },
+      "no_match": "fallback",
+      "needs_review": true,
+      "reason": "判据来自流程定义而非数据归纳，FAIL分支未被样本验证: g3 在观测的 23 轮里全部 PASS，样本内zero个FAIL反例；FAIL 分支写入的判据(\"git grep 冲突标记(^<<<<<<<|^>>>>>>>|^=======)有命中\" -> FAIL)直接抄自任务给定的\"流程背景\"对 g3 的既定定义，不是从这 23 轮数据统计出来的规律，需要人工用真实 FAIL 样本核实。"
+    },
+    {
+      "id": "n7",
+      "seq": 7,
+      "kind": "git",
+      "comment": "相对 feat/<项目>-integration 取该 worktree HEAD 的合并基点(merge_base)，供 seq8 改动清单计算使用",
+      "stability": "23/23",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} merge-base feat/<项目>-integration HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^merge_base=[0-9a-f]{40}$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n8",
+      "seq": 8,
+      "kind": "git",
+      "comment": "相对 merge-base 用 git diff --name-only 取改动文件清单及计数(changed_files)，供 seq9 逐文件行尾检查的列表来源",
+      "stability": "23/23",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} -c core.quotepath=false diff --name-only {sha} HEAD",
+      "bindings": {
+        "sha": {
+          "from": "n7.output.merge_base"
+        },
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^changed_files=\\d+$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n9",
+      "seq": 9,
+      "kind": "git",
+      "comment": "判决点g4(行尾)：对 seq8 改动清单中的每个文件在 HEAD 下取内容，统计 CR(\\r) 出现次数，任一文件 CR>0 -> FAIL，全部为0 -> PASS。既是逐文件循环的 map 节点，其自身聚合结果(ok字段/输出文本)同时就是g4的机械判决来源，与 changeset-audit 把'循环(seq13)'和'聚合判决(seq14)'拆成两个独立步骤不同。样本内22/23 PASS、1/23 FAIL(round-b2-01-<项目>-theme，13个文件CRLF，CR数41~1331)，是这4个点里唯一被数据验证过FAIL分支的 [v2] grep 改绝对路径：本机交互 shell 的 grep 是 ugrep 函数包装，与系统 grep 行为不一致，行尾检出会假阴性（今日已致两起真实误报）。",
+      "stability": "23/23",
+      "type": "map",
+      "cmd_template": "for f in <changed_files>; do git --no-optional-locks -C {worktree} show HEAD:\"$f\" | LC_ALL=C /usr/bin/grep -c $'\\r' || true; done  # 逐文件, 上限200",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "list_binding": {
+        "from": "n8.output"
+      },
+      "output_contract": "regex:^\\d+\\ files\\ checked;.*$",
+      "on_fail": "fallback",
+      "depends_on": [
+        "n8"
+      ],
+      "verdict_point": "g4",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback",
+      "verified_examples": [
+        {
+          "round": "round-b2-01-<项目>-theme",
+          "step_output": "66 files checked; files_with_cr>0:frontend/src/components/AdminNotifyPanel.vue(551),frontend/src/components/AdminNotifyUserPopup.vue(298),frontend/src/components/AiExplainer.vue(594),frontend/src/components/BugGuideModal.vue(242),frontend/src/components/BugReportDrawer.vue(862),frontend/src/components/ChatWidget.vue(698),frontend/src/components/DevCode.vue(41),frontend/src/components/GlobalSearch.vue(446),frontend/src/components/QrScanPanel.vue(478),frontend/src/components/QrScanner.vue(542),frontend/src/components/SignatureBlock.vue(156),frontend/src/views/ai-assistant/index.vue(1331),frontend/src/views/pest-control/index.vue(1103); skipped_deleted=0; truncated=False",
+          "verdict": "FAIL",
+          "fail_detail": "g4发现CRLF行尾文件(相对merge-base的改动清单内): frontend/src/components/AdminNotifyPanel.vue CR=551, frontend/src/components/AdminNotifyUserPopup.vue CR=298, frontend/src/components/AiExplainer.vue CR=594, frontend/src/components/BugGuideModal.vue CR=242, frontend/src/components/BugReportDrawer.vue CR=862, frontend/src/components/ChatWidget.vue CR=698, frontend/src/components/DevCode.vue CR=41, frontend/src/components/GlobalSearch.vue CR=446, frontend/src/components/QrScanPanel.vue CR=478, frontend/src/components/QrScanner.vue CR=542, frontend/src/components/SignatureBlock.vue CR=156, frontend/src/views/ai-assistant/index.vue CR=1331, frontend/src/views/pest-control/index.vue CR=1103"
+        }
+      ]
+    }
+  ],
+  "verdict_rules": [
+    {
+      "point": "g1",
+      "depends_on": [
+        "n3"
+      ],
+      "decision_node": "n3",
+      "stability": "23/23",
+      "type": "mechanical",
+      "needs_review": true,
+      "reason": "判据来自流程定义而非数据归纳，FAIL分支未被样本验证: g1 在观测的 23 轮里全部 PASS，样本内zero个FAIL反例；节点 n3 的FAIL判据(\"git status --porcelain 结果出现冲突码(UU/AA/DD/AU/UA/UD/DU)，或存在非'??'的已跟踪脏改动行\" -> FAIL)直接抄自任务给定的\"流程背景\"对 g1 的既定定义，不是从这 23 轮数据统计出来的规律，需要人工用真实FAIL样本核实。",
+      "comment": "g1 的FAIL判据来自流程定义而非数据归纳(样本内zero反例)。",
+      "validation_required": "FAIL 分支未被样本验证，接线前必须用扰动注入证明可触发（照 changeset-audit 的 C1-C4 做法）"
+    },
+    {
+      "point": "g2",
+      "depends_on": [
+        "n5"
+      ],
+      "decision_node": "n5",
+      "stability": "22/23",
+      "type": "mechanical",
+      "needs_review": true,
+      "reason": "判据来自流程定义而非数据归纳，FAIL分支未被样本验证: g2 在观测的 23 轮里全部 PASS，样本内zero个FAIL反例；节点 n5 的FAIL判据(\"worktree 对应 git-dir 下 CHERRY_PICK_HEAD/MERGE_HEAD/REBASE_HEAD/BISECT_LOG/rebase-merge/rebase-apply 任一标记文件存在\" -> FAIL)直接抄自任务给定的\"流程背景\"对 g2 的既定定义，不是从这 23 轮数据统计出来的规律，需要人工用真实FAIL样本核实。",
+      "comment": "g2 的FAIL判据来自流程定义而非数据归纳(样本内zero反例)。",
+      "validation_required": "FAIL 分支未被样本验证，接线前必须用扰动注入证明可触发（照 changeset-audit 的 C1-C4 做法）"
+    },
+    {
+      "point": "g3",
+      "depends_on": [
+        "n2",
+        "n6"
+      ],
+      "decision_node": "n6",
+      "stability": "23/23",
+      "type": "mechanical",
+      "needs_review": true,
+      "reason": "判据来自流程定义而非数据归纳，FAIL分支未被样本验证: g3 在观测的 23 轮里全部 PASS，样本内zero个FAIL反例；节点 n6 的FAIL判据(\"git grep 冲突标记(^<<<<<<<|^>>>>>>>|^=======)有命中\" -> FAIL)直接抄自任务给定的\"流程背景\"对 g3 的既定定义，不是从这 23 轮数据统计出来的规律，需要人工用真实FAIL样本核实。",
+      "comment": "g3 的FAIL判据来自流程定义而非数据归纳(样本内zero反例)。",
+      "validation_required": "FAIL 分支未被样本验证，接线前必须用扰动注入证明可触发（照 changeset-audit 的 C1-C4 做法）"
+    },
+    {
+      "point": "g4",
+      "depends_on": [
+        "n8",
+        "n9"
+      ],
+      "decision_node": "n9",
+      "stability": "23/23",
+      "type": "mechanical",
+      "comment": "g4 完全由 n9 的输出机械决定，23 轮观测 23/23 一致，无反例，无需模型介入。"
+    }
+  ],
+  "fallback": {
+    "action": "spawn_model",
+    "context": [
+      "run_history",
+      "current_node",
+      "matched_trajectory_ref"
+    ]
+  },
+  "conventions": {
+    "no_bare_grep": "禁用裸 grep（ugrep 包装假阴性）；git grep 是 git 子命令不受影响，可用"
+  },
+  "revision_log": [
+    {
+      "rev": "v2",
+      "date": "<日期>",
+      "by": "主会话人工审图",
+      "changes": "①删 n6 虚假 depends_on（head 词法碰撞误判）②行尾扫描 grep 改 /usr/bin/grep 绝对路径 ③g1/g2/g3 补 validation_required：FAIL 分支零样本，接线前须扰动注入验证 ④注：n5 稳定性 22/23 系主树与 worktree 的 git-dir 结构差异，非缺陷"
+    },
+    {
+      "rev": "v3",
+      "date": "<日期>",
+      "by": "复放运行器通用化+自建病态仓库真实验证（发现3处真实缺陷并修复）",
+      "changes": "①致命修复：n9(g4) cmd_template 里 `git show HEAD:\"<f>\"` 用了字面量占位符 <f> 而非 shell 循环变量 $f——推断是归纳器把真实历史轮次的具体命令抽象成通用模板时，误把循环变量 $f 当成了另一个待替换的模板槽位（类比 <changed_files>）写成了尖括号形式；历史 22/23 PASS + 1/23 FAIL(<项目>-theme) 的真实轨迹本身没问题，问题出在图把这条命令'模板化'成了一条实际不可执行的字符串——照此图直接复放会 100% 报 fatal:路径不存在，从未被验证过图上写的这条 cmd_template 真能在复放时执行成功。改为 $f 后用自建 P4(CRLF提交)/P1(脏树)/P5(干净对照)/真实 <项目>-theme worktree 交叉验证：CRLF 文件正确列出且计数匹配、非CRLF文件正确判0。②同一节点第二处缺陷：`grep -c` 在计数为 0 时退出码是 1（有匹配才是0，这是 grep 的既定行为），for 循环整体退出码取最后一条命令的退出码——只要清单里最后一个文件 CR=0（也就是最常见的「全干净」场景），循环退出码就是 1，被运行器当成工具报错触发兜底；changeset-audit 的 n13 早就在同一句尾巴上加了 `|| true` 来吃掉这个退出码，premerge-gate 的 n9 漏抄了这一句，补上。③n5(g2) cmd_template 的标记文件路径原硬编码为 <基座项目>-erp 的 linked-worktree 结构(${FLEET_INTEGRATION_REPO}/.git/worktrees/{worktree}/...)，对本轮自建的独立病态仓库(testfixtures/*)不成立；改为绑定 n4(seq4) 实测的 git-dir({git_dir}/<marker>)，对任意仓库/worktree 都成立，且用自建 P2(真实 merge 冲突未解决)验证命中 MERGE_HEAD 后正确判 FAIL。output_contract 同步放宽为覆盖 FAIL 形态(原 regex 只认 markers_found=none，FAIL 输出会被契约拒绝)。④以上三处缺陷均由本轮'自建病态仓库真实验证 FAIL 分支'的硬闸暴露——旧版 22/23、23/23 的高稳定性掩盖了 g2/g4 这些从未被真实触发过的分支、其 cmd_template 从未真正跑通过一次的事实。"
+    }
+  ]
+}

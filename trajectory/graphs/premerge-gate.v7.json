@@ -1,0 +1,280 @@
+{
+  "version": "v7",
+  "flow": "premerge-gate",
+  "input_vars": [
+    "worktree",
+    "branch",
+    "head"
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "seq": 1,
+      "kind": "git",
+      "comment": "查询 worktree 当前所在分支名(branch)，供绑定归因和一致性核对使用",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse --abbrev-ref HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n2",
+      "seq": 2,
+      "kind": "git",
+      "comment": "查询 worktree 当前 HEAD commit sha(head)，供绑定归因和一致性核对使用",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^head=[0-9a-f]{40}$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n3",
+      "seq": 3,
+      "kind": "git",
+      "comment": "判决点g1(树干净)：git status --porcelain 统计已跟踪脏改动(tracked_dirty)/未跟踪(untracked)/冲突(conflict)行数——conflict>0(冲突码 UU/AA/DD/AU/UA/UD/DU)或 tracked_dirty>0(非'??'的已跟踪脏改动) -> FAIL，否则(仅'??'或空) -> PASS。digest 按约定1携带 point=g1/verdict= 字段，判决点与步骤的关联由数据自动定位",
+      "stability": "15/15",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "git --no-optional-locks -C {worktree} status --porcelain",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "g1",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n4",
+      "seq": 4,
+      "kind": "git",
+      "comment": "查询该 worktree 对应的 git 目录路径(git_dir)，供 seq5 中态标记检查拼接标记文件路径使用",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} rev-parse --git-dir",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n5",
+      "seq": 5,
+      "kind": "logic",
+      "comment": "判决点g2(git中态)：检查 CHERRY_PICK_HEAD/MERGE_HEAD/REBASE_HEAD/BISECT_LOG/rebase-merge/rebase-apply 任一标记文件是否存在于 git-dir 下，任一存在 -> FAIL，全部不存在 -> PASS。digest 按约定1携带 point=g2/verdict= 字段",
+      "stability": "5/15",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "test -e .git/CHERRY_PICK_HEAD; test -e .git/MERGE_HEAD; test -e .git/REBASE_HEAD; test -e .git/BISECT_LOG; test -e .git/rebase-merge; test -e .git/rebase-apply",
+      "bindings": {},
+      "output_contract": "nonempty",
+      "verdict_point": "g2",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n6",
+      "seq": 6,
+      "kind": "git",
+      "comment": "判决点g3(冲突标记)：git grep 冲突标记(^<<<<<<<|^>>>>>>>|^=======)有命中 -> FAIL，无命中 -> PASS。digest 按约定1携带 point=g3/verdict= 字段",
+      "stability": "15/15",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "git --no-optional-locks -C {worktree} grep -l -E \"^(<<<<<<<|>>>>>>>|\\|\\|\\|\\|\\|\\|\\|)( .*)?$\" -- . | head -20",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "g3",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n7",
+      "seq": 7,
+      "kind": "git",
+      "comment": "相对 feat/<项目>-integration 取该 worktree HEAD 的合并基点(merge_base)，供 seq8 改动清单计算使用",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} merge-base feat/<项目>-integration HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^merge_base=[0-9a-f]{40}$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n8",
+      "seq": 8,
+      "kind": "git",
+      "comment": "相对 merge-base 用 git diff --name-only 取改动文件清单及计数(changed_files)，供 seq9 逐文件行尾检查的列表来源",
+      "stability": "15/15",
+      "type": "tool",
+      "cmd_template": "git --no-optional-locks -C {worktree} -c core.quotepath=false diff --name-only {sha} HEAD",
+      "bindings": {
+        "sha": {
+          "from": "n7.output.merge_base"
+        },
+        "worktree": {
+          "from": "input.worktree"
+        }
+      },
+      "output_contract": "regex:^changed_files=\\d+$",
+      "on_fail": "fallback"
+    },
+    {
+      "id": "n9",
+      "seq": 9,
+      "kind": "git",
+      "comment": "判决点g4(行尾)：[v6] 调用两图共用的 runner/checks/lineending_check.py，一次性取该 worktree 相对 merge-base(seq7)的全部改动文件的 before_cr/after_cr/added_crlf/deleted_crlf/verdict。base侧存在(修改/改名)时，改后CR == 改前CR + 新增行中CRLF数 - 删除行中CRLF数 -> PASS(存量行尾未动)，不等 -> AMBIGUOUS；base侧不存在(新增文件，项目为LF基线)时，有CR即FAIL、无CR则PASS。任一文件 FAIL -> g4 FAIL；无 FAIL 但有 AMBIGUOUS(可能是行尾被误翻的破坏，也可能是行尾还原的合规修复，机械判据本身分不出来) -> 转交新增节点 n9_llm 语义裁决(context 带 merge-base..HEAD 的提交日志)；都没有 -> PASS。既是逐文件循环+聚合判决合一的节点，与 changeset-audit 把'循环(n13)'和'聚合判决(n14)'拆成两个独立步骤不同。[实况修正 <日期>] 原判据(改后任一文件CR>0即FAIL)对 feat/<项目>-theme 13个文件曾判 FAIL(误报，已实锤)。新判据接线后实测：该分支 merge-base(a7daee794，早于 feat/crlf-sweep 清洗提交被合入 feat/<项目>-integration 的时点)与 HEAD(a51823489，分支自身的'行尾返工'提交，commit message 明确写'恢复合并基行尾')之间，13个文件逐文件 before_cr==after_cr 精确相等(如 AdminNotifyPanel.vue 551=551、ChatWidget.vue 698=698)，added_crlf==deleted_crlf 也逐文件相等——机械公式直接给出 PASS，全程 0 次 AMBIGUOUS、0 次模型调用，未真正触达 n9_llm。",
+      "stability": "0/0(判据v6改写，按约定8旧判据轨迹作废，需重新采样；本次仅完成 fixture+真实回归验证，未做批量轨迹重采)",
+      "type": "branch",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/lineending_check.py\" {worktree} {sha} HEAD",
+      "bindings": {
+        "worktree": {
+          "from": "input.worktree"
+        },
+        "sha": {
+          "from": "n7.output.merge_base"
+        }
+      },
+      "output_contract": "nonempty",
+      "on_fail": "fallback",
+      "depends_on": [
+        "n7"
+      ],
+      "verdict_point": "g4",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "all_pass": "PASS",
+        "any_fail": "FAIL",
+        "any_ambiguous_no_fail": "n9_llm"
+      },
+      "no_match": "fallback",
+      "exec": "logic"
+    },
+    {
+      "id": "n9_llm",
+      "type": "llm",
+      "verdict_point": "g4",
+      "comment": "当 n9 给出的逐文件行尾判据里存在 AMBIGUOUS(存量文件 改后CR != 改前CR+新增CRLF-删除CRLF)时，机械规则无法区分两种性质完全相反的改动：(a)把已经是 CRLF/混合行尾的存量文件整体转成了 LF(或反向)，行尾被误翻，这是最该抓的破坏；(b)有人把之前误翻的行尾还原回去，这是合规修复，理应放行。两者在'该文件 CR 计数对不上简单加减公式'这一点上数据形状完全相同，必须结合语义(merge-base..HEAD 的提交日志 + diff 实际改了什么)才能分辨。重要：提交信息里出现'行尾'/'CRLF'/'LF'/'还原'/'dos2unix'等字样只是弱信号，可能是真修复也可能是误导性的话术；不得仅凭这些关键词就判 PASS，仍须结合 before/after/added_crlf/deleted_crlf 的数值关系判断这次改动是否只涉行尾、有没有夹带看不出来的内容变更。",
+      "purpose": "解读 n9 的 AMBIGUOUS 明细(逐文件 before/after/added/deleted CRLF)与 merge-base..HEAD 的提交日志，判断是行尾破坏还是行尾修复，给出 g4 的最终 PASS/FAIL。",
+      "context": [
+        "n9.output",
+        "n7.output.merge_base",
+        "n2.output.head"
+      ],
+      "ambiguous_examples": [
+        {
+          "note": "AMBIGUOUS 路由目前仅在自建 fixture 上被真实触发过(F1 CRLF->LF整体转/F2 LF->CRLF整体转，两个纯行尾转换、零真实内容变化的场景)。生产样本 feat/<项目>-theme 实测在机械层面即可判 PASS(13个文件before_cr==after_cr 精确相等)，从未真正落到本节点——此处按 F1/F2 的实测形状记录参考样例，接线后需持续观察生产真触发。",
+          "fixture": "F1 lineending-f1-crlf-to-lf-*",
+          "detail": "status=M before_cr=30 after_cr=0 added_crlf=0 deleted_crlf=0 verdict=AMBIGUOUS；30+0-0=30 != 0，整篇文件从CRLF转LF、内容一字未改。"
+        },
+        {
+          "fixture": "F2 lineending-f2-lf-to-crlf-*",
+          "detail": "status=M before_cr=0 after_cr=30 added_crlf=0 deleted_crlf=0 verdict=AMBIGUOUS；0+0-0=0 != 30，整篇文件从LF转CRLF、内容一字未改。"
+        }
+      ]
+    }
+  ],
+  "verdict_rules": [
+    {
+      "point": "g1",
+      "depends_on": [
+        "n3"
+      ],
+      "decision_node": "n3",
+      "stability": "15/15",
+      "type": "mechanical",
+      "comment": "g1 完全由 n3 的输出机械决定，15 轮观测 15/15 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "g2",
+      "depends_on": [
+        "n5"
+      ],
+      "decision_node": "n5",
+      "stability": "5/15",
+      "type": "mechanical",
+      "comment": "g2 完全由 n5 的输出机械决定，15 轮观测 5/15 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "g3",
+      "depends_on": [
+        "n6"
+      ],
+      "decision_node": "n6",
+      "stability": "15/15",
+      "type": "mechanical",
+      "comment": "g3 完全由 n6 的输出机械决定，15 轮观测 15/15 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "g4",
+      "depends_on": [
+        "n8",
+        "n9"
+      ],
+      "decision_node": "n9",
+      "stability": "15/15(机械分支)",
+      "type": "llm",
+      "comment": "g4 的机械规则(n9 输出为 PASS/FAIL，即无 AMBIGUOUS)可直接判定；但 base 侧存在的文件若行尾计数对不上'改后==改前+新增CRLF-删除CRLF'公式，无法用机械规则区分是行尾被误翻的破坏还是行尾还原的合规修复，因此该分支移交 n9_llm 模型判断，不写死机械 FAIL 规则。生产回归(feat/<项目>-theme)实测走的是机械 PASS 快路径，0 次模型调用；AMBIGUOUS->n9_llm 路由目前只被 F1/F2 合成 fixture 真实触发过。",
+      "mechanical_shortcut": "n9 输出为 PASS 或 FAIL(无 AMBIGUOUS)时直接机械判定，无需模型",
+      "llm_node": "n9_llm"
+    }
+  ],
+  "fallback": {
+    "action": "spawn_model",
+    "context": [
+      "run_history",
+      "current_node",
+      "matched_trajectory_ref"
+    ]
+  },
+  "revision_log": [
+    {
+      "rev": "v6",
+      "date": "<日期>",
+      "by": "主会话人工审图（行尾判据升级：feat/<项目>-theme 并线阻断级误报纠正，与 changeset-audit.v5 同批次改写，判据脚本两图共用）",
+      "changes": "g4(行尾)判据全面改写，公式与 changeset-audit.v5 的 p5 完全相同，唯一差异是基线来源：changeset-audit 用 {sha}^1(单提交父提交)，premerge-gate 用 merge-base(feat/<项目>-integration, HEAD)(seq7/n7 已有)。旧判据「改后任一文件 CR>0 即 FAIL」对 feat/<项目>-theme 的13个文件(AdminNotifyPanel/ChatWidget/DevCode/SignatureBlock/ai-assistant/index 等)判 FAIL，抽查5个全部改前=改后CR、增删行数相等，属并线阻断级误报，已实锤纠正。①n9 改为调用两图共用的 runner/checks/lineending_check.py(CLI: <repo> <base_ref> <head_ref>)，base=n7 的 merge_base、head=HEAD，一次性拿到全部改动文件的 before_cr/after_cr/added_crlf/deleted_crlf/verdict。②新判据：base侧存在(修改/改名)时，改后CR == 改前CR + 新增行中CRLF数 - 删除行中CRLF数 -> PASS(存量行尾未动)，不等 -> AMBIGUOUS；base侧不存在(新增文件，项目为LF基线)时，有CR即FAIL、无CR则PASS。③关键实现决策：diff 必须带 --ignore-cr-at-eol，否则整篇 CRLF->LF 转换会让每一行都在字节层面产生差异(deleted_crlf 恰好等于 before_cr、added_crlf=0)，代入公式反而算出 PASS(等于没堵住'漏报整体转换'这个盲区)；--ignore-cr-at-eol 让'内容没变只是行尾变'的行不出现在 diff 的 +/- 里，使该公式对纯行尾转换正确给出 AMBIGUOUS。④新增 AMBIGUOUS 分支：无 FAIL 但有 AMBIGUOUS 时不直判 FAIL，转交新增节点 n9_llm，context 带 merge-base..HEAD 的提交日志 + 逐文件 before/after/added/deleted，提示模型提交信息含'行尾/CRLF/LF/还原/dos2unix'等字样只是弱信号，不得仅凭关键词判 PASS，仍须结合 diff 语义判断有无夹带内容变更。⑤fixture 五场景(F1/F2/F3/F4/F5，F1/F2 各带两个 commit message 变体)验证 5/5 符合预期。⑥真实回归：feat/<项目>-theme 实测 merge-base=a7daee794(早于 feat/crlf-sweep 清洗提交并入 feat/<项目>-integration 的时点)，HEAD=a51823489(分支自身'行尾返工'提交，已把13个文件行尾精确恢复至与 merge-base 相同：如 AdminNotifyPanel.vue 551=551、ChatWidget.vue 698=698、DevCode.vue 41=41、SignatureBlock.vue 156=156、ai-assistant/index.vue 1331=1331，added_crlf==deleted_crlf 逐文件相等)，g4 由 FAIL 精确翻转为 PASS，0 个 AMBIGUOUS，0 次模型调用——走的是机械PASS 快路径，不是 AMBIGUOUS->LLM 兜底路径。n9_llm 的 AMBIGUOUS 路由目前只被 F1/F2 合成 fixture 真实触发过，生产样本从未触发，留作接线后的持续观察点。⑦g1-g3 判决点结果不变。[遗留说明] v5 由归纳器重采(15轮:5 fixture+10真实worktree)生成，未带 revision_log/conventions 字段；本次是首次对 v5 手工审图修订，revision_log 数组从本条(v6)开始记录，v2-v5 沿革见 premerge-gate.v2~v4.json 自身的 revision_log。"
+    },
+    {
+      "rev": "v7",
+      "date": "<日期>",
+      "by": "主会话人工审图（A3 负例补账：g3 冲突标记判据的误报与空转分支，由新建 fixture F-A3-G3a/G3b 实证）",
+      "changes": "g3(冲突标记)判据改写。【问题】旧正则 ^(<<<<<<<|>>>>>>>|=======)$ 要求整行恰好等于那七个字符。用 F-A3-G3a(把 git 真实写出的冲突块提交进仓库)逐分支实测：^<<<<<<<$ 命中 0 个文件、^>>>>>>>$ 命中 0 个文件、^=======$ 命中 1 个——因为 git 写出的开头/结尾标记必带标签(`<<<<<<< HEAD` / `>>>>>>> other/side`)，带后缀的行匹配不上\"整行恰好等于\"，三个分支里只有中间那行光秃秃的等号真正在生效。【后果】markdown 的 setext 一级标题下划线正是一串等号，恰好七个时与判据完全重合：F-A3-G3b 用一份正常文档实测被判 FAIL，属误报，会把合规候选整个拦下(与 v6 纠正的行尾误报同类)。【改法】开头/结尾/diff3 基线三种标记一律允许带标签后缀，使其真正生效；同时移除光秃秃的 `=======`——真实冲突块必定同时带开头与结尾标记，去掉中间那行不损失检出力，却消掉了与正常文档唯一的撞车面。【验证】F-A3-G3a(committed 冲突块)命中、F-A3-G2b(cherry-pick 冲突停在半路)命中、F-A3-G3b(markdown setext)不命中、F-CLEAN 不命中。【已知边界】正文里合法展示冲突块示例的教学文档仍会被命中，属显性误报(人一眼能判)，不像 setext 标题那样毫无线索，接受。【口径】g1/g2/g4 判决逻辑不变；v6 原样保留可跑(硬约定10)。旧命令原文：git --no-optional-locks -C {worktree} grep -l -E \"^(<<<<<<<|>>>>>>>|=======)$\" -- . | head -20"
+    }
+  ]
+}

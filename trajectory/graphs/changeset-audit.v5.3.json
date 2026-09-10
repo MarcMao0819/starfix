@@ -1,0 +1,545 @@
+{
+ "version": "v5.3",
+ "flow": "changeset-audit",
+ "input_vars": [
+  "changeset_no"
+ ],
+ "runtime_vars": [
+  "workdir"
+ ],
+ "conventions": {
+  "digest_normalization": "各 tool/map 节点的 output_contract 校验对象是『归一化摘要』而非裸 stdout：运行器须按节点实现 normalize(raw)->digest（如 n4/n5 裸数字包装为 count=N；n7/n8/n12 列表归纳为 'N rows sorted; ...' 形态；n13 归纳为 'N files checked; fail=N(...); ambiguous=N(...)' 形态（改后不再是每文件绝对CR计数，而是共用脚本 runner/checks/lineending_check.py 给出的before/after/added_crlf/deleted_crlf/verdict）；n14 归纳为 'point=p5 verdict=<PASS|FAIL|ROUTED_TO_LLM> ...' 形态；n9b 归纳为 'BASELINE_FOUND N=.. baseline=.. git_count=..' 或 'NOT_FOUND searched_N=1..N' 形态），与轨迹 output_digest 同构后再验契约",
+  "materialize_outputs": {
+   "n7": "{workdir}/n7_{changeset_no}.txt",
+   "n8": "{workdir}/n8_{changeset_no}.txt"
+  },
+  "readonly_guard": "运行器执行任何 cmd 前按前缀白名单校验只读（docker exec…mysql -e SELECT / git cat-file|diff|show|rev-parse / diff|test|echo|grep|wc|sort|for），白名单外前缀一律拒跑并走 fallback"
+ },
+ "revision_log": [
+  {
+   "rev": "v2",
+   "date": "<日期>",
+   "by": "主会话人工审图",
+   "changes": "①n5/n8 git 加 -c core.quotepath=false，从源头消除中文路径八进制转义假阳性（n9_llm 保留兜底真不一致）②n9 中间文件从会话级临时目录改为 {workdir} 约定并配材料化约定 ③n14 标记 exec:logic 由运行器原生实现聚合 ④新增 digest 归一化与只读白名单约定"
+  },
+  {
+   "rev": "v3",
+   "date": "<日期>",
+   "by": "主会话人工审图（holdout 发现边界后修订）",
+   "changes": "n10 契约 [0-9A-F]{6} 放宽为 [0-9A-F]{2,24}：HEX(LEFT(title,3)) 按字符截取，utf8mb4 中文每字符最多 4 字节，3 字符最长 24 位十六进制；归纳期 10 单标题恰好全为 ASCII 前缀（UX-/BOM-），契约口径过窄，holdout 0065/0066/0067（中文开头标题）暴露此边界并触发兜底——按设计流程回图修订"
+  },
+  {
+   "rev": "v4",
+   "date": "<日期>",
+   "by": "主会话人工审图（0070 十提交特性分支单暴露的多提交边界修订，舰队锚点裁定口径落地）",
+   "changes": "①n6 三方计数不等由直判 FAIL 改为 DEFER，挂起交 n9b 终裁：CS-<日期>-0070 是 10 提交特性分支单(锚点=分支HEAD非merge)，n5 的 {sha}^1 单提交口径只看到最后1个文件，与 DB 明细(10个文件)天然不等，直判FAIL会把真实数据误判成造假 ②新增 n9b(exec:logic 多提交基线搜索节点，位于 n9 与 n10 之间)：触发条件=n9 diff>0(bad_signal) 或 p2==DEFER；取 n7 已材料化的 DB 文件清单，从 sha~1 起逐级向历史深处搜索基线 N(先 git rev-parse {sha}~N 探测是否越过仓库起点，失败即停搜，最多探到 N=50)，每级都用 git -c core.quotepath=false diff --name-only {sha}~N {sha} 排序后与 DB 清单做集合逐字比较(不是逐行文本diff，是值集合比较)；命中即 p2=PASS(git_count=DB清单数)、p3=PASS，证据写明 resolved_baseline=该 sha~N 的完整40位sha；1..50 全不中则 p2 由 DEFER 改判 FAIL(若 p2 本已是PASS则维持不变)，p3 转交 n9_llm 语义兜底 ③n9 路由改为：good_signal(diff=0) 且 p2 非 DEFER 时才走原快路径直接 PASS(单提交特性分支单如0055-0069的这条路径零变化)；否则先经 n9b 搜索，n9b 不中才最终兜底到 n9_llm ④这条基线搜索本身就是舰队锚点裁定口径(存在某基线使 git diff <基线> <锚点> --name-only 与 DB 明细逐字相等)的直接算法实现，不是放宽验证尺度——真正编造/多算/漏算的文件明细无法被任何一段连续祖先区间的 diff 复现，搜索找不到基线就等价于'不存在满足裁定口径的基线'，仍然是真不一致(FAIL/转LLM)，只是把口径从'仅检查^1单提交窗口'正确扩展到'检查全部候选基线窗口'"
+  },
+  {
+   "rev": "v5",
+   "date": "<日期>",
+   "by": "主会话人工审图（行尾判据升级：两笔生产误报 CS-<日期>-0055 / feat/<项目>-theme 纠正）",
+   "changes": "p5(行尾)判据全面改写。旧判据「改后任一文件 CR>0 即 FAIL」检的是文件绝对状态而非本次改动，有三类盲区：①漏报——整体把 CRLF 转成 LF(存量行尾被翻)，改后 CR=0 反而全绿，而这正是最该抓的破坏(3行改动出97行diff)；②误报合规修复——把行尾还原回去的修正提交被判违规；③误报无辜改动(已实锤两笔)——CS-<日期>-0055 的 frontend/src/composables/useDropdownData.ts 改前CR=223、改后232、增11删2，223+11-2=232 分毫不差，存量行尾未动，旧判据判 FAIL 是错的；feat/<项目>-theme 的13个文件抽查5个全部改前=改后CR、增删行数相等，旧判据的并线阻断告警是误报。①n13 改为调用两图共用的 runner/checks/lineending_check.py（CLI: <repo> <base_ref> <head_ref>），base={sha}^1、head={sha}，一次性拿到该 commit 的全部改动文件的 before_cr/after_cr/added_crlf/deleted_crlf/verdict，不再依赖 n12 的 DB 文件清单(n12 保留原样，仍记 DB 侧非删除文件清单供审计参照，只是不再是 n13 的输入)。②新判据：base侧存在(修改/改名)时，改后CR == 改前CR + 新增行中CRLF数 - 删除行中CRLF数 -> PASS(存量行尾未动)，不等 -> AMBIGUOUS；base侧不存在(新增文件，项目为LF基线)时，有CR即FAIL、无CR则PASS。③关键实现决策：diff 必须带 --ignore-cr-at-eol，否则整篇CRLF->LF转换会让每一行都在字节层面产生差异，deleted_crlf 恰好等于 before_cr、added_crlf=0，代入公式反而算出 PASS(等于没堵住盲区①)；--ignore-cr-at-eol 让'内容没变只是行尾变'的行不出现在 diff 的 +/- 里，使该公式对纯行尾转换正确给出AMBIGUOUS，对真实编辑(如0055的11增2删)保持不受影响。④n14 新增 AMBIGUOUS 分支：无 FAIL 但有 AMBIGUOUS 时不再直判 FAIL，因为'行尾被误翻'与'行尾还原的合规修复'在数据形状上完全相同——转交新增节点 n14_llm，context 带提交信息(git log -1 --format=%B)+ 逐文件 before/after/added/deleted，提示模型：提交信息含'行尾/CRLF/LF/还原/dos2unix'等字样只是弱信号、不得仅凭关键词判 PASS，仍须结合 diff 语义判断有无夹带内容变更。⑤fixture 五场景(F1 CRLF->LF整体转/F2 LF->CRLF整体转/F3 存量CRLF正常改几行/F4 混合行尾正常改动/F5 新增整篇CRLF文件)验证 5/5 符合预期，F1/F2 各自两个commit message 变体(带/不带修复关键词)验证模型未仅凭关键词改判。⑥真实回归：CS-<日期>-0055 p5 由 FAIL 翻转为 PASS(15个改动文件全部 PASS，0 个AMBIGUOUS，0 次模型调用——两笔误报实证均在机械层面即可纠正，不需要真的触达 n14_llm；n14_llm 的 AMBIGUOUS 路由目前只被 F1/F2 合成 fixture 真实触发过，生产样本(0055/0058/0070)里从未触发，这是接线后留意的残留观察点)；CS-<日期>-0058/CS-<日期>-0070 回归仍全 PASS 且 0 调用；p1-p4 判决点结果不变。"
+  },
+  {
+   "rev": "v5.1",
+   "date": "<日期>",
+   "by": "主会话人工审图（两笔真实缺陷修复：多提交交付误报 CS-<日期>-0052 / 非代码交付撞代码核验图中止 CS-<日期>-0050）",
+   "changes": "①n9b 基线搜索由『仅沿第一父链 sha~N(N=1..50)』改为三级候选按序试，每级都要求『该基线到锚点(sha)的文件集合与 DB 明细集合逐字相等』：⑴sha^1(单提交快路径，保持现有行为) ⑵merge-base(feat/<项目>-integration, sha)(多提交分支标准基线，本次新增) ⑶沿第一父链 sha~N(N=1..50，保持现有)。根因：CS-<日期>-0052 是登记明细与实际交付一致的真实多提交分支单，锚点所在分支含 merge commit，第一父链从锚点起怎么搜都到不了 merge-base(=ab6171d135ef5a7ea53ded52ada73ab621a95415)，50 层内必然搜空——判决实录 n6 DEFER -> n9 ROUTED_TO_N9B -> 旧 n9b NOT_FOUND(searched_N=1..50)，把真实交付误判 FAIL；而 git diff --name-only <merge-base> <锚点> 与登记明细逐字相等，merge-base 是唯一能复现登记明细的基线。每级候选解出基线 sha 后都做 base==head 断言(与锚点相同则跳过，不当命中)——<日期> CS-<日期>-0032 实证过共享对象库里 merge-base 会退化成 HEAD 的坑。命中的候选在证据里记录来源 via(^1/merge-base/~N)与 resolved_baseline；三级全不中(真不一致)才判 FAIL，证据附与 merge-base 候选(若曾解出)两侧文件集合的差集。②n1 之后、n2 之前新增入口类型短路节点 n1b：change_type=='data_migration' 且 branch 在本地 git 仓库中不存在(git rev-parse --verify --quiet 失败/为空) 且 changeset 明细文件路径均无可识别代码扩展名(CODE_EXTENSIONS 白名单，刻意不含 .sql/.tsv/.csv 等数据/快照格式)——三条判据须同时成立(AND，保守边界，宁可多查不可漏查，但凡一条不满足就照常从 n2 起走完整核验)，命中则整单直判 N/A、aborted=false、不调模型，不再往后跑 n2..n14。根因：非代码交付(如纯数据迁移单)此前会撞上整张代码核验图——n1 的 commit_hash 契约要求 40 位十六进制，数据迁移单该字段为 NULL，n1 即走 fallback 兜底(调一次模型)，随后 n2..n14 因 commit_hash 缺失连锁 BLOCKED，最终五点全 NEEDS_HUMAN 且 aborted=true(CS-<日期>-0050 实证：44.7s，调了一次模型)。为此 n1 的 SQL 增列 change_type/branch(供 n1b 判据读取)，output_contract 的 commit_hash 段放宽为 [0-9a-f]{40} 或字面 NULL(mysql -e 对 NULL 值打印的就是字面'NULL'字符串)——放宽只影响 n1 自身是否顺利解析出字段，commit_hash 的真实格式校验仍在下游 n2(p1)机械判据里，未被削弱：短路路径(data_migration)根本不会走到 n2，继续路径(正常代码单)若 commit_hash 真的缺失/非法仍会在 n2 判 REGEX_FAIL(p1=FAIL)。③以上两处改动是本轮唯二改动，n2..n14/n9_llm/n14_llm/verdict_rules 逐字未动。"
+  },
+  {
+   "rev": "v5.2",
+   "date": "<日期>",
+   "by": "主会话人工审图（n1b 由数据迁移短路升级为统一入口分诊，新增已并线分流：今天 CS-<日期>-0053/0054 一批候选已并线，复扫时 merge-base 退化、判据一路误报产生纯噪音告警，CS-<日期>-0052 并线后重跑 v5.1 图 p2/p3 直接 FAIL 且白调一次模型即为实证）",
+   "changes": "n1b 从『仅判非代码交付一种类型』扩成『入口分诊』，按序判三类，命中即分流、不再走 p1-p5：①类型A(非代码交付)＝v5.1 原判据逐字保留，命中仍整单判 N/A。②类型B(已并线，本次新增，要害在双分流)：判据 git merge-base --is-ancestor <n1.commit_hash 即登记锚点> <feat/<项目>-integration 即集成线HEAD(复用 n9b 既有的 MERGE_BASE_REF_BRANCH 常量)> 成立(锚点已在集成线上)。命中后必须再查 runtime.db 的 trace_runs(定义『完整轮次』＝该 changeset_no 存在 node_id='n14' 的记录，即 p1-p4 已过机械核验且 p5 判据已给出)，分两路——B-1 有历史：取时间最新一轮，逐点(p1..p5)在该 run_id 内取最后写入的判决值复算 overall，overall=SKIPPED_ALREADY_MERGED，证据引用 prior_run_id/prior_ts/prior_overall/prior_verdicts(以并线前判词为准，这是消噪音的主路径)；B-2 查无历史：overall=ALERT_MERGED_WITHOUT_AUDIT，绝不静默跳过——只跳不查历史，带外并线的单就静默逃逸了，那正是这道分诊要堵的洞。③类型C(其它不适用)：预留扩展点，本次不实现具体判据，运行器里留 TODO 注释与插入位置，行为等同于『没有类型C』。三类都不调模型、aborted=false、SQLite trace_runs/run_evidence 照常留痕(prior_run_id 等字段一并落 run_evidence，便于日后统计各类分流量)。以上是本轮唯一改动，n1/n2..n14/n9b/n9_llm/n14_llm/verdict_rules 逐字未动——n1b 的 output_contract 相应放宽为可接受 SKIPPED_ALREADY_MERGED/ALERT_MERGED_WITHOUT_AUDIT 前缀，其余三个既有前缀(SHORT_CIRCUIT/CONTINUE)不变。"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "n1",
+   "seq": 1,
+   "kind": "sql",
+   "comment": "按变更单号查询变更记录基本信息(内部id/标题/提交哈希/文件数/变更类型/分支)，是后续所有校验的起点。[v5.1] 增列 change_type/branch，供紧邻的 n1b 入口类型短路判据读取；commit_hash 契约放宽为可接受 NULL(字面字符串)，因为 change_type=data_migration 的登记单不挂 commit——真正的 sha 格式校验仍在 n2(p1)，此处放宽不影响正常代码单的判决。 [v5.3 <日期>] 契约放宽为**只管解析、不管格式**：changeset_no 由 CS-\\d{8}-\\d{4} 放宽为 \\S+，commit_hash 由 ([0-9a-f]{40}|NULL) 放宽为 \\S*。理由与 v5.1 放宽 commit_hash 时逐字相同——n1 是取数节点，真实格式校验在下游 n2(p1) 机械判据里，未被削弱。全量试跑实证：15 单因 n1 契约不认识而 abort(单号格式 6 + 短哈希 9)，每单烧 30~55 秒 + 至少 1 次模型兜底，最后得出一个正则就能得出的结论，且整单落 NEEDS_HUMAN——**等于这 15 单从来没被真正审过**。放宽后它们照常走 n2..n14，短哈希单会在 n2 得到精确的 p1=FAIL(零模型)，而不是五探针一律 NEEDS_HUMAN。",
+   "stability": "10/10",
+   "type": "tool",
+   "cmd_template": "/usr/local/bin/docker exec ${DB_CONTAINER} sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 ${DB_NAME} -e \"SELECT id, changeset_no, title, commit_hash, file_count, change_type, branch FROM t_code_changeset WHERE changeset_no=\\\"{changeset_no}\\\" AND is_del=0\"'",
+   "bindings": {
+    "changeset_no": {
+     "from": "input.changeset_no"
+    }
+   },
+   "output_contract": "regex:^id=\\d+\\tchangeset_no=\\S+\\ttitle=.+\\tcommit_hash=\\S*\\tfile_count=\\d+\\tchange_type=.*\\tbranch=.*$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n1b",
+   "seq": "1b",
+   "kind": "compare",
+   "type": "branch",
+   "exec": "logic",
+   "comment": "[v5.2 升级为入口分诊] 在 n1 之后、n2 之前按序判三类，命中即分流、不再走 p1-p5、不调模型：类型A(非代码交付，[v5.1]原判据逐字保留)——n1 的 commit_hash 契约要求40位十六进制，数据迁移单该字段为 NULL，此前会撞上整张代码核验图连锁 BLOCKED 到五点全 NEEDS_HUMAN 且 aborted=true 还白调一次模型(CS-<日期>-0050 实证)；类型B(已并线，[v5.2]本次新增，要害在双分流)——已并线单复扫时 n9b 的 merge-base 候选会因 base==head 退化被跳过、^1/~N 也可能因分支已并入集成线而搜不到与登记明细逐字相等的基线，产生纯噪音误报(CS-<日期>-0052 实证：并线后重跑 v5.1 图 p2/p3 直接 FAIL 且白调一次模型)，命中后必查历史审计，绝不静默跳过——查到即用旧判词消噪音，查不到则报警而非放行(带外并线绕过机检的洞正是它要堵的)；类型C(其它不适用，预留扩展点，本次不实现)。",
+   "purpose": "顺序判定，命中即分流：①类型A——三条判据须同时成立(AND，保守边界，宁可多查不可漏查)：n1.change_type=='data_migration' 且 branch 在本地 git 仓库中不存在(git rev-parse --verify --quiet 失败/branch 为空或字面 NULL) 且 changeset 明细文件路径均无可识别代码扩展名(CODE_EXTENSIONS 白名单，刻意不含 sql/tsv/csv 等数据快照格式)——三者全满足 -> SHORT_CIRCUIT(N/A)。②类型B——git merge-base --is-ancestor <n1.commit_hash> <feat/<项目>-integration> 成立(登记锚点已在集成线上) -> 已并线；命中后查 runtime.db 的 trace_runs 该 changeset_no 是否存在含 node_id='n14' 的完整判决轮次：有 -> B-1 SKIPPED_ALREADY_MERGED(证据引用 prior_run_id 与复算判词，以并线前判词为准)；无 -> B-2 ALERT_MERGED_WITHOUT_AUDIT(绝不静默跳过)。③类型C——预留，本次不实现具体判据。三类都不命中 -> CONTINUE，照常从 n2 起走完整核验。",
+   "cmd_template": "RUNNER_LOGIC: 类型A(与 v5.1 相同)：change_type!=data_migration 则该类型不命中；否则 git -C ${FLEET_INTEGRATION_REPO} rev-parse --verify --quiet {branch} 判断 branch 是否存在于本地仓库，且复用 n7 同款 SQL(SELECT file_path FROM t_code_change_file WHERE changeset_id={changeset_id} AND is_del=0) 取明细文件扩展名集合与 CODE_EXTENSIONS 白名单比对，三者全满足判 SHORT_CIRCUIT。类型B([v5.2]新增，A 未命中时判)：git -C ${FLEET_INTEGRATION_REPO} merge-base --is-ancestor {commit_hash} feat/<项目>-integration(exit 0=已并线)；已并线则查 SQLite runtime.db 的 trace_runs(SELECT run_id, ts FROM trace_runs WHERE changeset_no={changeset_no} AND node_id='n14' ORDER BY ts DESC LIMIT 1)，查到复算该 run_id 逐点(p1..p5)最新判决值判 SKIPPED_ALREADY_MERGED，查无判 ALERT_MERGED_WITHOUT_AUDIT。类型C(预留)：本次不实现，不判定任何 case。三类都不命中判 CONTINUE。",
+   "bindings": {
+    "change_type": {
+     "from": "n1.output.change_type"
+    },
+    "branch": {
+     "from": "n1.output.branch"
+    },
+    "changeset_id": {
+     "from": "n1.output.id"
+    },
+    "commit_hash": {
+     "from": "n1.output.commit_hash"
+    }
+   },
+   "output_contract": "regex:^(SHORT_CIRCUIT|SKIPPED_ALREADY_MERGED|ALERT_MERGED_WITHOUT_AUDIT|CONTINUE)\\ .*$",
+   "cases": {
+    "type_a_short_circuit": "整单判 N/A(p1..p5 全部置 N/A)，aborted=false，不调模型，n2..n14 一律不再执行",
+    "type_b1_skipped_already_merged": "整单判 SKIPPED_ALREADY_MERGED(p1..p5 全部置该值)，aborted=false，不调模型，n2..n14 一律不再执行，证据引用并线前最新一轮完整判决(prior_run_id/prior_ts/prior_overall/prior_verdicts)",
+    "type_b2_alert_merged_without_audit": "整单判 ALERT_MERGED_WITHOUT_AUDIT(p1..p5 全部置该值)，aborted=false，不调模型，n2..n14 一律不再执行，需人工核查该单是否绕过机检并线",
+    "type_c_reserved": "预留扩展点，本次不实现具体判据",
+    "continue": "三类都不命中，照常从 n2 起走完整核验，判决逻辑与 v5.1 完全一致"
+   },
+   "depends_on": [
+    "n1"
+   ]
+  },
+  {
+   "id": "n2",
+   "seq": 2,
+   "kind": "compare",
+   "comment": "校验 commit_hash 是否符合40位十六进制格式(SHA-1)",
+   "stability": "10/10",
+   "type": "branch",
+   "cmd_template": "echo \"{sha}\" | grep -Eq '^[0-9a-f]{{40}}$' && echo REGEX_OK || echo REGEX_FAIL",
+   "bindings": {
+    "sha": {
+     "from": "n1.output.commit_hash"
+    }
+   },
+   "output_contract": "regex:^REGEX_OK$",
+   "verdict_point": "p1",
+   "predicate": "mechanical_signal_from_output(good_signal)",
+   "cases": {
+    "good_signal": "PASS",
+    "bad_signal": "FAIL"
+   },
+   "no_match": "fallback"
+  },
+  {
+   "id": "n3",
+   "seq": 3,
+   "kind": "git",
+   "comment": "确认该 commit_hash 在本地 git 仓库中确实存在，且对象类型是 commit",
+   "stability": "10/10",
+   "type": "tool",
+   "cmd_template": "git -C ${FLEET_INTEGRATION_REPO} cat-file -t {sha}",
+   "bindings": {
+    "sha": {
+     "from": "n1.output.commit_hash"
+    }
+   },
+   "output_contract": "regex:^commit$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n4",
+   "seq": 4,
+   "kind": "sql",
+   "comment": "从变更文件明细表按 changeset_id 统计未删除的文件行数",
+   "stability": "10/10",
+   "type": "tool",
+   "cmd_template": "/usr/local/bin/docker exec ${DB_CONTAINER} sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 ${DB_NAME} -N -e \"SELECT COUNT(*) FROM t_code_change_file WHERE changeset_id={changeset_id} AND is_del=0\"'",
+   "bindings": {
+    "changeset_id": {
+     "from": "n1.output.id"
+    }
+   },
+   "output_contract": "regex:^count=\\d+$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n5",
+   "seq": 5,
+   "kind": "git",
+   "comment": "用 git diff 统计该 commit 相对父提交实际改动的文件数",
+   "stability": "10/10",
+   "type": "tool",
+   "cmd_template": "git -C ${FLEET_INTEGRATION_REPO} -c core.quotepath=false diff --name-only {sha}^1 {sha} | wc -l",
+   "bindings": {
+    "sha": {
+     "from": "n1.output.commit_hash"
+    }
+   },
+   "output_contract": "regex:^count=\\d+$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n6",
+   "seq": 6,
+   "kind": "compare",
+   "comment": "三方文件数核对: changeset.file_count / t_code_change_file 计数 / git diff 计数是否链式相等。不等不再直接判 FAIL——git diff 计数用的是 n5 的 {sha}^1 单提交口径，对多提交特性分支单(锚点=分支HEAD)天然会比 DB 明细少，不能仅凭此断言数据造假，故 v4 起改判 DEFER 挂起，转交 n9b 做多提交基线搜索终裁",
+   "stability": "10/10",
+   "type": "branch",
+   "cmd_template": "test {db_changeset_file_count} -eq {db_change_file_count} -a {db_change_file_count} -eq {git_count} && echo MATCH || echo MISMATCH",
+   "bindings": {
+    "db_changeset_file_count": {
+     "from": "n1.output.file_count",
+     "ambiguous_candidates": [
+      "n1.output.file_count",
+      "n4.output.count",
+      "n5.output.count"
+     ]
+    },
+    "db_change_file_count": {
+     "from": "n4.output.count",
+     "ambiguous_candidates": [
+      "n1.output.file_count",
+      "n4.output.count",
+      "n5.output.count"
+     ]
+    },
+    "git_count": {
+     "from": "n5.output.count",
+     "ambiguous_candidates": [
+      "n1.output.file_count",
+      "n4.output.count",
+      "n5.output.count"
+     ]
+    }
+   },
+   "output_contract": "regex:^(PASS|DEFER)\\ \\(db_changeset_file_count=\\d+\\ db_change_file_count=\\d+\\ git_count=\\d+\\)$",
+   "verdict_point": "p2",
+   "predicate": "mechanical_signal_from_output(good_signal)",
+   "cases": {
+    "good_signal": "PASS",
+    "bad_signal": "DEFER:n9b"
+   },
+   "no_match": "fallback"
+  },
+  {
+   "id": "n7",
+   "seq": 7,
+   "kind": "sql",
+   "comment": "从变更文件明细表按 changeset_id 取出全部文件路径(已排序)",
+   "stability": "10/10",
+   "type": "tool",
+   "cmd_template": "/usr/local/bin/docker exec ${DB_CONTAINER} sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 ${DB_NAME} -N -e \"SELECT file_path FROM t_code_change_file WHERE changeset_id={changeset_id} AND is_del=0 ORDER BY file_path\"'",
+   "bindings": {
+    "changeset_id": {
+     "from": "n1.output.id"
+    }
+   },
+   "output_contract": "regex:^\\d+\\ rows\\ sorted;.*$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n8",
+   "seq": 8,
+   "kind": "git",
+   "comment": "用 git diff 取出该 commit 实际改动的文件路径(已排序)",
+   "stability": "10/10",
+   "type": "tool",
+   "cmd_template": "git -C ${FLEET_INTEGRATION_REPO} -c core.quotepath=false diff --name-only {sha}^1 {sha} | sort",
+   "bindings": {
+    "sha": {
+     "from": "n1.output.commit_hash"
+    }
+   },
+   "output_contract": "regex:^\\d+\\ rows\\ sorted;.*$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n9",
+   "seq": 9,
+   "kind": "compare",
+   "comment": "逐行 diff 对比 DB 侧文件路径清单与 git 侧文件路径清单(^1单提交口径)。good_signal(diff=0) 且 p2 非 DEFER 时走原快路径直接判 PASS(单提交特性分支单零变化)；否则(bad_signal，或 p2==DEFER)转交 n9b 做多提交分支基线搜索，n9b 搜不到基线才最终兜底到 n9_llm 语义判断",
+   "stability": "10/10",
+   "type": "branch",
+   "cmd_template": "diff {workdir}/n7_{changeset_no}.txt {workdir}/n8_{changeset_no}.txt | wc -l",
+   "bindings": {
+    "changeset_no": {
+     "from": "input.changeset_no",
+     "ambiguous_candidates": [
+      "input.changeset_no",
+      "n1.output.changeset_no"
+     ]
+    },
+    "db_files": {
+     "from": "n7.output"
+    },
+    "git_files": {
+     "from": "n8.output"
+    }
+   },
+   "output_contract": "regex:^diff_line_count=\\d+;.*$",
+   "verdict_point": "p3",
+   "note": "db_files/git_files 为结构性绑定(按 kind+输出形态匹配最近前驱步骤)，非按值匹配",
+   "predicate": "mechanical_signal_from_output(good_signal) with p2 gate",
+   "cases": {
+    "good_signal_and_p2_not_defer": "PASS",
+    "otherwise": "n9b"
+   },
+   "no_match": "n9b"
+  },
+  {
+   "id": "n9b",
+   "seq": "9b",
+   "kind": "git",
+   "type": "branch",
+   "exec": "logic",
+   "comment": "[v5.1 重写] 多提交特性分支基线搜索。触发条件：n9 diff>0(bad_signal)，或 p2==DEFER(n6三方计数不等)。三级候选基线按序试：①sha^1(单提交快路径) ②merge-base(feat/<项目>-integration, sha)(多提交分支标准基线，v5.1 新增) ③沿第一父链 sha~N(N=1..50)兜底搜索。CS-<日期>-0070 是10提交特性分支单(锚点9239d529=分支HEAD非merge，第一父链能搜到)；CS-<日期>-0052 则是含 merge commit 的分支单，第一父链从锚点起怎么搜都到不了 merge-base(=ab6171d135ef5a7ea53ded52ada73ab621a95415)，50层内必然搜空——这正是新增②的动因。舰队锚点裁定口径不变：『存在某基线使 git diff <基线> <锚点> --name-only 与 DB 明细逐字相等』，三级候选是穷举这个『存在』的三条实现路径，找到即证明 DB 明细真实可复现，三条都找不到才是真不一致。",
+   "purpose": "取 n7 已材料化的 DB 文件清单(集合)；三级候选依次试(每级都跳过 base==head 的退化候选)：①git rev-parse {sha}^1 ②git merge-base feat/<项目>-integration {sha} ③for N in 1..50: git rev-parse {sha}~N(失败即停搜)；每个候选解出基线后都跑 git -c core.quotepath=false diff --name-only <基线> {sha} 排序后与 DB 清单集合逐字比较(值集合比较，非逐行文本diff)；相等即命中，记录来源 via(^1/merge-base/~N)与该基线的完整40位sha 作为 resolved_baseline。",
+   "cmd_template": "RUNNER_LOGIC: 读 n7 已材料化 DB 文件清单为集合；候选①git -C ${FLEET_INTEGRATION_REPO} rev-parse {sha}^1；候选②git -C ${FLEET_INTEGRATION_REPO} merge-base feat/<项目>-integration {sha}；候选③for N in 1..50: git -C ${FLEET_INTEGRATION_REPO} rev-parse {sha}~N (失败即停搜)；每个候选解出基线(且不等于{sha})后跑 git -C ${FLEET_INTEGRATION_REPO} -c core.quotepath=false diff --name-only <基线> {sha} | sort，与 DB 集合逐字比较；相等即停，记 resolved_baseline=完整sha、via=命中的候选标签、git_count=清单数；三级候选都不中则宣告 NOT_FOUND",
+   "bindings": {
+    "sha": {
+     "from": "n1.output.commit_hash"
+    },
+    "db_files": {
+     "from": "n7.output"
+    }
+   },
+   "note": "候选②的参照分支 feat/<项目>-integration 是运行器里的硬编码常量(MERGE_BASE_REF_BRANCH)，不是 binding 解出的值——这是舰队裁定的多提交分支标准并线目标坐标，不是按值匹配的输入。",
+   "trigger": "n9.bad_signal OR p2==DEFER",
+   "output_contract": "regex:^(BASELINE_FOUND\\ resolved_baseline=[0-9a-f]{40}\\ via=(\\^1|merge-base|~\\d+)\\ git_count=\\d+|NOT_FOUND\\ tried=\\^1,merge-base,~1\\.\\.\\d+.*)$",
+   "verdict_point": [
+    "p2",
+    "p3"
+   ],
+   "predicate": "set_equal(sorted(git_diff_name_only(candidate_baseline, sha)), set(db_files_from_n7)) for candidate in [sha^1, merge-base(feat/<项目>-integration, sha), sha~1..50]",
+   "cases": {
+    "baseline_found": "p2=PASS(git_count=len(db_files), resolved_baseline=命中候选的完整sha, via=^1|merge-base|~N); p3=PASS",
+    "not_found": "p2=FAIL(仅当 p2 原为 DEFER 时改写；若 p2 本已是 PASS 则维持不变); p3 转交 n9_llm；证据附与 merge-base 候选(若曾解出)两侧文件集合差集"
+   },
+   "on_fail": "n9_llm",
+   "depends_on": [
+    "n7",
+    "n9"
+   ]
+  },
+  {
+   "id": "n10",
+   "seq": 10,
+   "kind": "sql",
+   "comment": "取变更记录标题及标题前3字节的十六进制，用于乱码检测",
+   "stability": "10/10",
+   "type": "tool",
+   "cmd_template": "/usr/local/bin/docker exec ${DB_CONTAINER} sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 ${DB_NAME} -e \"SELECT title, HEX(LEFT(title,3)) FROM t_code_changeset WHERE changeset_no=\\\"{changeset_no}\\\" AND is_del=0\"'",
+   "bindings": {
+    "changeset_no": {
+     "from": "input.changeset_no",
+     "ambiguous_candidates": [
+      "input.changeset_no",
+      "n1.output.changeset_no"
+     ]
+    }
+   },
+   "output_contract": "regex:^title=.+\\thex_left3=[0-9A-F]{2,24}$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n11",
+   "seq": 11,
+   "kind": "compare",
+   "comment": "检查标题是否包含典型 GBK/UTF-8 错解码乱码字符",
+   "stability": "10/10",
+   "type": "branch",
+   "cmd_template": "echo \"{title}\" | grep -E '[åãæÂÃ]' && echo GARBLED || echo CLEAN",
+   "bindings": {
+    "title": {
+     "from": "n10.output.title"
+    }
+   },
+   "output_contract": "nonempty",
+   "verdict_point": "p4",
+   "predicate": "mechanical_signal_from_output(good_signal)",
+   "cases": {
+    "good_signal": "PASS",
+    "bad_signal": "FAIL"
+   },
+   "no_match": "fallback"
+  },
+  {
+   "id": "n12",
+   "seq": 12,
+   "kind": "sql",
+   "comment": "从变更文件明细表取非 DELETE 类型的文件路径清单(供逐文件 CRLF 检查使用)[v5 说明] 该清单不再是 n13 的输入——n13 改为直接调用 lineending_check.py 通过 git diff 自行发现改动文件；此步骤保留，只作为 DB 侧非删除文件清单的审计留痕。",
+   "stability": "10/10",
+   "type": "tool",
+   "cmd_template": "/usr/local/bin/docker exec ${DB_CONTAINER} sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" --default-character-set=utf8mb4 ${DB_NAME} -N -e \"SELECT file_path FROM t_code_change_file WHERE changeset_id={changeset_id} AND is_del=0 AND change_action<>\\\"DELETE\\\" ORDER BY file_path\"'",
+   "bindings": {
+    "changeset_id": {
+     "from": "n1.output.id"
+    }
+   },
+   "output_contract": "regex:^\\d+\\ non\\-delete\\ files:.*$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n13",
+   "seq": 13,
+   "kind": "git",
+   "comment": "[v5] 行尾判据改写：调用两图共用的 runner/checks/lineending_check.py，一次性取该 commit 相对父提交({sha}^1)全部改动文件的 before_cr/after_cr/added_crlf/deleted_crlf/verdict(PASS存量未动/AMBIGUOUS差值不可解释/FAIL新增文件带CR/SKIP删除文件不参与判决)。不再依赖 n12 的 DB 文件清单，文件发现由脚本自身通过 git diff --name-status 完成。",
+   "stability": "0/0(判据v5改写，按约定8旧判据轨迹作废，需重新采样；本次仅完成 fixture+真实回归验证，未做批量轨迹重采)",
+   "type": "tool",
+   "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/lineending_check.py\" ${FLEET_INTEGRATION_REPO} {sha}^1 {sha}",
+   "bindings": {
+    "sha": {
+     "from": "n1.output.commit_hash"
+    }
+   },
+   "output_contract": "regex:^\\d+\\ files\\ checked;\\ fail=\\d+\\(.*\\);\\ ambiguous=\\d+\\(.*\\)$",
+   "on_fail": "fallback"
+  },
+  {
+   "id": "n14",
+   "seq": 14,
+   "kind": "compare",
+   "comment": "汇总 n13 的逐文件行尾判据。任一 FAIL(新增文件带CR，项目LF基线) -> p5 FAIL；无 FAIL 但有 AMBIGUOUS(存量文件行尾计数对不上'改后==改前+新增CRLF-删除CRLF'公式，可能是存量行尾被误翻的破坏，也可能是把行尾还原回去的合规修复，机械判据本身分不出来) -> 转交 n14_llm 语义裁决；两者都没有 -> PASS。",
+   "stability": "0/0(判据v5改写，按约定8旧判据轨迹作废，需重新采样；本次仅完成 fixture+真实回归验证，未做批量轨迹重采)",
+   "type": "branch",
+   "exec": "logic",
+   "cmd_template": "RUNNER_LOGIC: 读 n13 逐文件行尾判据记录；任一 verdict=FAIL -> p5=FAIL；无 FAIL 但有 verdict=AMBIGUOUS -> 转交 n14_llm 语义裁决；都没有 -> p5=PASS",
+   "bindings": {},
+   "output_contract": "nonempty",
+   "verdict_point": "p5",
+   "predicate": "mechanical_signal_from_output(good_signal)",
+   "cases": {
+    "all_pass": "PASS",
+    "any_fail": "FAIL",
+    "any_ambiguous_no_fail": "n14_llm"
+   },
+   "no_match": "fallback",
+   "depends_on": [
+    "n13"
+   ]
+  },
+  {
+   "id": "n9_llm",
+   "type": "llm",
+   "verdict_point": "p3",
+   "comment": "当 DB 侧与 git 侧的文件路径清单逐行 diff 结果非空时，机械规则(diff行数==0才PASS)无法区分'两侧文件集合真的不一致'与'仅因 git core.quotepath 对非ASCII文件名做八进制转义显示、或因此引起的排序位移导致的假阳性非零 diff'。10轮里出现2轮这类假阳性(round1 diff=10, round3 diff=4，fail_detail 都明确写着'Same N files present'即两侧文件集合相同)，故该分支移交模型判断，而不是写死'diff>0就FAIL'的机械规则。",
+   "purpose": "解读 n9 的非零diff/异常输出，判断是否为真实数据不一致，给出 p3 的最终 PASS/FAIL 及理由",
+   "context": [
+    "n7.output",
+    "n8.output",
+    "n9.output",
+    "input.changeset_no"
+   ],
+   "ambiguous_examples": [
+    {
+     "round": 1,
+     "fail_detail": "diff_line_count=10. git core.quotepath default octal-escapes 2 non-ASCII paths (docs/02-.../README.md, docs/05-.../frontend-remote-search-select.md) vs raw UTF-8 in DB; sort-order shift also moves PlanServiceImpl.java by one line. Same 15 files present on both sides."
+    },
+    {
+     "round": 3,
+     "fail_detail": "diff_line_count=4. git core.quotepath default octal-escapes the 1 non-ASCII path (docs/05-.../frontend-remote-search-select.md) vs raw UTF-8 in DB. Same 2 files present."
+    }
+   ]
+  },
+  {
+   "id": "n14_llm",
+   "type": "llm",
+   "verdict_point": "p5",
+   "comment": "当 n13 给出的逐文件行尾判据里存在 AMBIGUOUS(存量文件 改后CR != 改前CR+新增CRLF-删除CRLF)时，机械规则无法区分两种性质完全相反的改动：(a)把已经是 CRLF/混合行尾的存量文件整体转成了 LF(或反向)，行尾被误翻，这是最该抓的破坏；(b)有人把之前误翻的行尾还原回去，这是合规修复，理应放行。两者在'该文件 CR 计数对不上简单加减公式'这一点上数据形状完全相同，必须结合语义(提交信息+diff实际改了什么)才能分辨。重要：提交信息里出现'行尾'/'CRLF'/'LF'/'还原'/'dos2unix'等字样只是弱信号，可能是真修复也可能是误导性的话术；不得仅凭这些关键词就判 PASS，仍须结合 before/after/added_crlf/deleted_crlf 的数值关系判断这次改动是否只涉行尾、有没有夹带看不出来的内容变更。",
+   "purpose": "解读 n13 的 AMBIGUOUS 明细(逐文件 before/after/added/deleted CRLF)与该 commit 的提交信息，判断是行尾破坏还是行尾修复，给出 p5 的最终 PASS/FAIL。",
+   "context": [
+    "n13.output",
+    "n1.output.commit_hash",
+    "n1.output.title"
+   ],
+   "ambiguous_examples": [
+    {
+     "note": "AMBIGUOUS 路由目前仅在自建 fixture 上被真实触发过(F1 CRLF->LF整体转/F2 LF->CRLF整体转，两个纯行尾转换、零真实内容变化的场景)，生产样本(0055/0058/0070)在机械层面即可判 PASS，从未真正落到本节点——此处按 F1/F2 的实测形状记录参考样例，接线后需持续观察生产真触发。",
+     "fixture": "F1 lineending-f1-crlf-to-lf-*",
+     "detail": "status=M before_cr=30 after_cr=0 added_crlf=0 deleted_crlf=0 verdict=AMBIGUOUS；30+0-0=30 != 0，整篇文件从CRLF转LF、内容一字未改。"
+    },
+    {
+     "fixture": "F2 lineending-f2-lf-to-crlf-*",
+     "detail": "status=M before_cr=0 after_cr=30 added_crlf=0 deleted_crlf=0 verdict=AMBIGUOUS；0+0-0=0 != 30，整篇文件从LF转CRLF、内容一字未改。"
+    }
+   ]
+  }
+ ],
+ "verdict_rules": [
+  {
+   "point": "p1",
+   "depends_on": [
+    "n1",
+    "n2",
+    "n3"
+   ],
+   "decision_node": "n2",
+   "stability": "10/10",
+   "type": "mechanical",
+   "comment": "p1 完全由 n2 的输出机械决定，10 轮观测 10/10 一致，无反例，无需模型介入。"
+  },
+  {
+   "point": "p2",
+   "depends_on": [
+    "n4",
+    "n5",
+    "n6"
+   ],
+   "decision_node": "n6",
+   "stability": "10/10",
+   "type": "mechanical",
+   "comment": "p2 完全由 n6 的输出机械决定，10 轮观测 10/10 一致，无反例，无需模型介入。"
+  },
+  {
+   "point": "p3",
+   "depends_on": [
+    "n7",
+    "n8",
+    "n9"
+   ],
+   "decision_node": "n9",
+   "stability": "10/10",
+   "type": "llm",
+   "comment": "p3 的机械规则(n9 输出的好信号==PASS)在观测的 10 轮里与实际判决 10/10 一致，但存在 2 轮的 FAIL 是由编码/展示差异导致的假阳性(fail_detail 明确写出两侧文件集合相同)。因此非零/异常分支移交 n9_llm 模型判断，不写死机械 FAIL 规则。",
+   "mechanical_shortcut": "n9 输出为 0-diff/好信号 时直接 PASS，无需模型",
+   "llm_node": "n9_llm"
+  },
+  {
+   "point": "p4",
+   "depends_on": [
+    "n10",
+    "n11"
+   ],
+   "decision_node": "n11",
+   "stability": "10/10",
+   "type": "mechanical",
+   "comment": "p4 完全由 n11 的输出机械决定，10 轮观测 10/10 一致，无反例，无需模型介入。"
+  },
+  {
+   "point": "p5",
+   "depends_on": [
+    "n12",
+    "n13",
+    "n14"
+   ],
+   "decision_node": "n14",
+   "stability": "10/10",
+   "type": "llm",
+   "comment": "p5 的机械规则(n14 输出为 PASS/FAIL，即无 AMBIGUOUS)在观测样本里可直接判定；但 base 侧存在的文件若行尾计数对不上'改后==改前+新增CRLF-删除CRLF'公式，无法用机械规则区分是行尾被误翻的破坏还是行尾还原的合规修复，因此该分支移交 n14_llm 模型判断，不写死机械 FAIL 规则。",
+   "mechanical_shortcut": "n14 输出为 PASS 或 FAIL(无 AMBIGUOUS)时直接机械判定，无需模型",
+   "llm_node": "n14_llm"
+  }
+ ],
+ "fallback": {
+  "action": "spawn_model",
+  "context": [
+   "run_history",
+   "current_node",
+   "matched_trajectory_ref"
+  ]
+ },
+ "changelog": [
+  {
+   "version": "v5.3",
+   "date": "<日期>",
+   "changes": "唯一改动：n1.output_contract 放宽 changeset_no 与 commit_hash 两段为解析级(\\S+ / \\S*)。n1b/n2..n14/n9b/n9_llm/n14_llm/verdict_rules 逐字未动。动机见 TRJ-PROD 大批量试跑报告§四：执行器病 15 单 = 单号格式 6 + 短哈希 9，是耗时长尾主体(均值 11.21s vs 中位 0.12s)。"
+  }
+ ]
+}

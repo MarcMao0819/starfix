@@ -1,0 +1,33 @@
+{
+  "_说明": [
+    "IM 接力的收件人与应用配置样例。真实文件**不进仓库**（.gitignore 已挡 im-contacts.json）。",
+    "放到 $FLEET_HOME/im-contacts.json，或用环境变量 IM_CONTACTS_JSON 指到别处。",
+    "所有 ID 这里都是占位，换成你自己 IM 平台上的真实用户 ID。",
+    "密钥不要写进本文件：优先用环境变量 IM_APP_SECRET，其次 app_secret_file 指向一个只含密钥的文件。"
+  ],
+
+  "app_id": "<你的 IM 应用 ID>",
+
+  "app_secret_file": "${SECRETS_DIR}/im-app-secret",
+
+  "cc": "Owner",
+
+  "contacts": {
+    "Owner": "<Owner 的 IM 用户 ID>",
+    "<质量负责人1>": "<该角色的 IM 用户 ID>",
+    "<质量负责人2>": "<该角色的 IM 用户 ID>",
+    "<生产负责人1>": "<该角色的 IM 用户 ID>",
+    "<生产负责人2>": "<该角色的 IM 用户 ID>",
+    "<采购负责人>": "<该角色的 IM 用户 ID>",
+    "<商务客服>": "<该角色的 IM 用户 ID>",
+    "<同事A>": "<该角色的 IM 用户 ID>",
+    "<同事B>": "<该角色的 IM 用户 ID>"
+  },
+
+  "titles": {
+    "_说明": "发消息抬头用的尊称，按角色配；不配就直接用 contacts 里的名字。",
+    "<质量负责人1>": "<尊称>",
+    "<生产负责人1>": "<尊称>",
+    "Owner": "<尊称>"
+  }
+}

@@ -1,0 +1,196 @@
+{
+ "skill": "browse_v6",
+ "result": {
+  "ts": "<日期>T10:29:53.483788+00:00",
+  "blocks_total": 20,
+  "executed": 6,
+  "failed": 0,
+  "skipped_by_guard": 3,
+  "not_a_command": 0,
+  "authorized_at_compile": 1,
+  "declined_at_compile": 3,
+  "denied_blocks": 7,
+  "halted_at": null,
+  "emitted_tokens": [
+   "TEL_PROMPTED",
+   "VENDORED_GSTACK"
+  ],
+  "results": [
+   {
+    "id": "b1",
+    "kind": "branch",
+    "status": "OK",
+    "rc": 0,
+    "ms": 144,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": [
+     "TEL_PROMPTED",
+     "VENDORED_GSTACK"
+    ]
+   },
+   {
+    "id": "b2",
+    "kind": "human_gate",
+    "status": "AUTHORIZED_AT_COMPILE",
+    "why": "编译期已授权（a1=yes，应答人 owner）"
+   },
+   {
+    "id": "b3",
+    "kind": "human_gate",
+    "status": "DECLINED_AT_COMPILE",
+    "why": "编译期用户拒绝（a2=no，应答人 owner）；其后非 Always-run 块一律跳过"
+   },
+   {
+    "id": "b4",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 139,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b5",
+    "kind": "cmd",
+    "status": "DENIED_BY_COMPILE_ANSWER",
+    "why": "前一道闸被用户拒绝，且本块未标 Always run"
+   },
+   {
+    "id": "b6",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "条件 TEL_PROMPTED=yes 不等于期望 no"
+   },
+   {
+    "id": "b7",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 132,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b8",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 130,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b9",
+    "kind": "human_gate",
+    "status": "DECLINED_AT_COMPILE",
+    "why": "编译期用户拒绝（a3=no，应答人 owner）；其后非 Always-run 块一律跳过"
+   },
+   {
+    "id": "b10",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "条件 VENDORED_GSTACK=no 不等于期望 yes"
+   },
+   {
+    "id": "b11",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 148,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b12",
+    "kind": "cmd",
+    "status": "DENIED_BY_COMPILE_ANSWER",
+    "why": "前一道闸被用户拒绝，且本块未标 Always run"
+   },
+   {
+    "id": "b13",
+    "kind": "human_gate",
+    "status": "DECLINED_AT_COMPILE",
+    "why": "编译期用户拒绝（a4=no，应答人 owner）；其后非 Always-run 块一律跳过"
+   },
+   {
+    "id": "b14",
+    "kind": "cmd",
+    "status": "DENIED_BY_COMPILE_ANSWER",
+    "why": "前一道闸被用户拒绝，且本块未标 Always run"
+   },
+   {
+    "id": "b15",
+    "kind": "cmd",
+    "status": "DENIED_BY_COMPILE_ANSWER",
+    "why": "前一道闸被用户拒绝，且本块未标 Always run"
+   },
+   {
+    "id": "b16",
+    "kind": "cmd",
+    "status": "DENIED_BY_COMPILE_ANSWER",
+    "why": "前一道闸被用户拒绝，且本块未标 Always run"
+   },
+   {
+    "id": "b17",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 186,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b18",
+    "kind": "branch",
+    "status": "DENIED_BY_COMPILE_ANSWER",
+    "why": "前一道闸被用户拒绝，且本块未标 Always run"
+   },
+   {
+    "id": "b19",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'NEEDS_SETUP' 未成立（已回显令牌: TEL_PROMPTED, VENDORED_GSTACK）"
+   },
+   {
+    "id": "b20",
+    "kind": "cmd",
+    "status": "DENIED_BY_COMPILE_ANSWER",
+    "why": "前一道闸被用户拒绝，且本块未标 Always run"
+   }
+  ]
+ },
+ "canary": {
+  "verdict": "BASELINE_WRITTEN",
+  "diffs": []
+ }
+}

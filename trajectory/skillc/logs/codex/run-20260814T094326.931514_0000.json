@@ -1,0 +1,329 @@
+{
+ "skill": "codex",
+ "result": {
+  "ts": "<日期>T09:43:26.931514+00:00",
+  "blocks_total": 26,
+  "executed": 16,
+  "failed": 3,
+  "skipped_by_guard": 3,
+  "not_a_command": 4,
+  "halted_at": null,
+  "emitted_tokens": [],
+  "results": [
+   {
+    "id": "b1",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 130,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b2",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 124,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b3",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 209,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b4",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 239,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b5",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 193,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b6",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'A' 未成立（已回显令牌: 无）"
+   },
+   {
+    "id": "b7",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 236,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b8",
+    "kind": "cmd",
+    "status": "NOT_A_COMMAND",
+    "why": "bash -n 不解析，判定该围栏不是命令：/var/folders/pk/7tfwj29d7tvdfd5kk31ypm680000gn/T/tmpw__ojwtc.sh: line 1: syntax error near unexpected token `newline'"
+   },
+   {
+    "id": "b9",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 222,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b10",
+    "kind": "cmd",
+    "status": "NOT_A_COMMAND",
+    "why": "bash -n 不解析，判定该围栏不是命令：/var/folders/pk/7tfwj29d7tvdfd5kk31ypm680000gn/T/tmpj18o_v6j.sh: line 2: syntax error near unexpected token `newline'"
+   },
+   {
+    "id": "b11",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 223,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b12",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 243,
+    "out_tail": [
+     "ARTIFACTS_SYNC: off",
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b13",
+    "kind": "cmd",
+    "status": "NOT_A_COMMAND",
+    "why": "bash -n 不解析，判定该围栏不是命令：/var/folders/pk/7tfwj29d7tvdfd5kk31ypm680000gn/T/tmpih74t7cv.sh: line 1: syntax error near unexpected token `newline'"
+   },
+   {
+    "id": "b14",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 284,
+    "out_tail": [
+     "ARTIFACTS_SYNC: off",
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b15",
+    "kind": "cmd",
+    "status": "FAILED",
+    "rc": 127,
+    "ms": 329,
+    "out_tail": [
+     "ARTIFACTS_SYNC: off",
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---"
+    ],
+    "err_tail": [
+     "${FLEET_HOME}/.claude/skills/gstack/bin/gstack-question-preference: line 187: bun: command not found"
+    ],
+    "emitted": []
+   },
+   {
+    "id": "b16",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 339,
+    "out_tail": [
+     "ARTIFACTS_SYNC: off",
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b17",
+    "kind": "cmd",
+    "status": "FAILED",
+    "rc": 127,
+    "ms": 367,
+    "out_tail": [
+     "ARTIFACTS_SYNC: off",
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b18",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 378,
+    "out_tail": [
+     "ARTIFACTS_SYNC: off",
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b19",
+    "kind": "cmd",
+    "status": "FAILED",
+    "rc": 2,
+    "ms": 353,
+    "out_tail": [
+     "ARTIFACTS_SYNC: off",
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b20",
+    "kind": "branch",
+    "status": "OK",
+    "rc": 0,
+    "ms": 319,
+    "out_tail": [
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---",
+     "FOUND: ${FLEET_HOME}/.codex/bin/codex"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b21",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'NOT_FOUND' 未成立（已回显令牌: 无）"
+   },
+   {
+    "id": "b22",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 362,
+    "out_tail": [
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---",
+     "FOUND: ${FLEET_HOME}/.codex/bin/codex"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b23",
+    "kind": "branch",
+    "status": "OK",
+    "rc": 0,
+    "ms": 404,
+    "out_tail": [
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---",
+     "FOUND: ${FLEET_HOME}/.codex/bin/codex"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b24",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'AUTH_FAILED' 未成立（已回显令牌: 无）"
+   },
+   {
+    "id": "b25",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 370,
+    "out_tail": [
+     "--- RECENT ARTIFACTS ---",
+     "--- END ARTIFACTS ---",
+     "FOUND: ${FLEET_HOME}/.codex/bin/codex"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b26",
+    "kind": "cmd",
+    "status": "NOT_A_COMMAND",
+    "why": "bash -n 不解析，判定该围栏不是命令：/var/folders/pk/7tfwj29d7tvdfd5kk31ypm680000gn/T/tmpu52ylk0m.sh: line 2: syntax error near unexpected token `)'"
+   }
+  ]
+ },
+ "canary": {
+  "verdict": "BASELINE_WRITTEN",
+  "diffs": []
+ }
+}

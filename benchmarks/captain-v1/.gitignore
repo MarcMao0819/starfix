@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+runs/
+ratings.json
+*.log
+.DS_Store

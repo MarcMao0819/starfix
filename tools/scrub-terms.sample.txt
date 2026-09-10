@@ -1,0 +1,37 @@
+# scrub-terms.sample.txt —— 敏感词表的**格式样例**（真实词表不入仓）
+#
+# 每行一个 HMAC-SHA256(盐, 词) 的前 16 位十六进制。盐与真实词表都不进仓库。
+#
+# 为什么是加盐 HMAC 而不是裸哈希：
+#   短字符串的裸哈希可以字典还原。实测过——用常见姓 × 常见名用字 + 地名
+#   造出约 22 万条候选，几秒钟就从一份 37 条的 sha1 词表里还原出 13 条
+#   （9 个人名 + 4 个地名）。"哈希了所以能公开"对**可枚举的短明文**不成立。
+#   加盐之后，没有盐就无法枚举，所以盐必须留在仓外。
+#
+# ── 怎么用 ────────────────────────────────────────────────────────────
+# 1) 造一把盐（32 字节随机 hex），放仓外、权限 600：
+#      mkdir -p ~/.starfix && chmod 700 ~/.starfix
+#      python3 -c "import secrets;print(secrets.token_hex(32))" > ~/.starfix/scrub-salt
+#      chmod 600 ~/.starfix/scrub-salt
+#
+# 2) 把你的敏感词逐个算成 HMAC，写进 ~/.starfix/scrub-terms.hmac（600）：
+#      python3 - <<'EOF' > ~/.starfix/scrub-terms.hmac
+#      import hmac, hashlib, os
+#      salt = open(os.path.expanduser('~/.starfix/scrub-salt')).read().strip()
+#      TERMS = ['真名一', '真名二', '公司名', 'ProductCode']      # ← 换成你自己的
+#      for t in sorted(hmac.new(salt.encode(), x.encode(), hashlib.sha256).hexdigest()[:16]
+#                      for x in TERMS):
+#          print(t)
+#      EOF
+#      chmod 600 ~/.starfix/scrub-terms.hmac
+#
+# 3) 跑门禁（盐经环境变量给，不写进任何文件）：
+#      export SCRUB_SALT="$(cat ~/.starfix/scrub-salt)"
+#      tools/scrub-gate.sh
+#
+#    词表放别处就设 SCRUB_TERMS=<路径>。
+#    **不设词表也能跑**：门禁降级为只跑结构型判据，并明确提示"人名那一层没查"。
+#
+# ── 下面这一行是格式示例 ──────────────────────────────────────────────
+# 盐 = "example"，词 = "example-name" 时，HMAC-SHA256 前 16 位为：
+517f3b6eec19951d

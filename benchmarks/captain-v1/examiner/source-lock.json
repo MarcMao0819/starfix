@@ -1,0 +1,20 @@
+{
+  "note": "本轮已读取题源的内容快照；上层规范并行修订，哈希用于识别后续漂移。",
+  "additional_source": "用户本轮补充的舰长十问、困难版与组织考试要求，优先于最初方向书侧重点。",
+  "sha256": {
+    "doctrine/03-舰长考核与benchmark方向.md": "7e9a58a5dd529302a9793b386b4491b1830b3beec7c31f199ddf0844d6cd5c1e",
+    "doctrine/01-指挥方法论.md": "c05fb8e60c99810ebb059a88d9459aff983185cf95bf84aba3e39e717666cbc6",
+    "doctrine/02-试错战例集.md": "b4f49f61756a581ad8b0a0a74b1a9bfa7c80220c76c1b34e8a6368656e215e56",
+    "templates/01-任务书.md": "7261edda8b14e9443aeb9f1df8f1fd26a75f67a300643786551684f659ca11dc",
+    "templates/02-回执.md": "97fa60a428b1c9b801be80e75dbb57ae038bb69bbfe025341c495fe35671699d",
+    "templates/03-交接.md": "a6999fff38a2edf6fa013513a29d854fc81183b8745951b8e0de75752b7d3406",
+    "specs/monitors.md": "32019933809c04b20f74d5bad9d43af70a5c2f2f855199a83d6a159785e8f6f0",
+    "specs/delivery-terminal.md": "5fdc95d34a0725aaacd5626c2a26a5037973354ba4278d57292510ed09f7341b",
+    "skill/SKILL.md": "3978de7b79f05b756de36fc2fac77fdf6ce2a26575085e231db0faed38b8a60c",
+    "specs/task-activator.md": "c7c3621f10a8d221fd872f43456f39cff23ffa36a970aa392ac4c43863c31a25",
+    "scripts/task-activator.py": "25cfc7912509c6e603d61f97ac4893b226b6d1be12b7e2a572a61d85a4fb2988",
+    "templates/04-舰员画像.md": "be5b44808498b9e33ff1e06b95f626c3963487317c58e19e165476fad3080435",
+    "templates/05-对接人画像.md": "7539d0b7551fe0dfb88aa510d45023a5c07cb111fd6590cd15f1d329f38ab287",
+    "specs/memory-system.md": "3547057adeb45dc255aa58a0c194a669c706b1c3be90a77ed071399084161a39"
+  }
+}

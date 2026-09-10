@@ -1,0 +1,86 @@
+{
+ "skill": "browse_v2",
+ "result": {
+  "ts": "<日期>T10:09:01.154282+00:00",
+  "blocks_total": 20,
+  "executed": 3,
+  "failed": 0,
+  "skipped_by_guard": 2,
+  "not_a_command": 0,
+  "halted_at": "b6",
+  "emitted_tokens": [
+   "TEL_PROMPTED",
+   "VENDORED_GSTACK"
+  ],
+  "results": [
+   {
+    "id": "b1",
+    "kind": "branch",
+    "status": "OK",
+    "rc": 0,
+    "ms": 161,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": [
+     "TEL_PROMPTED",
+     "VENDORED_GSTACK"
+    ]
+   },
+   {
+    "id": "b2",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'UPGRADE_AVAILABLE' 未成立（已回显令牌: TEL_PROMPTED, VENDORED_GSTACK）"
+   },
+   {
+    "id": "b3",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'feature-prompted-continuous-checkpoint' 未成立（已回显令牌: TEL_PROMPTED, VENDORED_GSTACK）"
+   },
+   {
+    "id": "b4",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 150,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b5",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 298,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b6",
+    "kind": "human_gate",
+    "status": "HALTED_AT_HUMAN_GATE",
+    "text": "If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: ask telemetry once via AskUserQuestion:",
+    "why": "命中人闸，须人工放行"
+   }
+  ]
+ },
+ "canary": {
+  "verdict": "BASELINE_WRITTEN",
+  "diffs": []
+ }
+}

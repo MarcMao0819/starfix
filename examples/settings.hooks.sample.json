@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": "bash ${FLEET_HOME}/hooks/starfix-precompact.sh" } ] }
+    ],
+    "SessionStart": [
+      { "matcher": "compact|resume", "hooks": [ { "type": "command", "command": "bash ${FLEET_HOME}/hooks/starfix-sessionstart.sh" } ] }
+    ],
+    "PostCompact": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": "bash ${FLEET_HOME}/hooks/starfix-postcompact.sh" } ] }
+    ]
+  },
+  "_note": "三个 starfix-*.sh 是本机包装：export FLEET_HOME 等环境变量后 exec 仓内 scripts/hooks/ 对应脚本。hook 不继承你的 shell rc，所以环境变量要在包装里显式给。"
+}

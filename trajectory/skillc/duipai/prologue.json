@@ -1,0 +1,82 @@
+[
+ {
+  "id": "n2",
+  "phase": "prologue",
+  "heading": "Preamble (run first)",
+  "lines": [
+   25,
+   104
+  ],
+  "cmd": "_UPD=$(~/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/skills/gstack/bin/gstack-update-check 2>/dev/null || true)\n[ -n \"$_UPD\" ] && echo \"$_UPD\" || true\nmkdir -p ~/.gstack/sessions\ntouch ~/.gstack/sessions/\"$PPID\"\n_SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')\nfind ~/.gstack/sessions -mmin +120 -type f -exec rm {} + 2>/dev/null || true\n_PROACTIVE=$(~/.claude/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo \"true\")\n_PROACTIVE_PROMPTED=$([ -f ~/.gstack/.proactive-prompted ] && echo \"yes\" || echo \"no\")\n_BRANCH=$(git branch --show-current 2>/dev/null || echo \"unknown\")\necho \"BRANCH: $_BRANCH\"\n_SKILL_PREFIX=$(~/.claude/skills/gstack/bin/gstack-config get skill_prefix 2>/dev/null || echo \"false\")\necho \"PROACTIVE: $_PROACTIVE\"\necho \"PROACTIVE_PROMPTED: $_PROACTIVE_PROMPTED\"\necho \"SKILL_PREFIX: $_SKILL_PREFIX\"\nsource <(~/.claude/skills/gstack/bin/gstack-repo-mode 2>/dev/null) || true\nREPO_MODE=${REPO_MODE:-unknown}\necho \"REPO_MODE: $REPO_MODE\"\n_LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo \"yes\" || echo \"no\")\necho \"LAKE_INTRO: $_LAKE_SEEN\"\n_TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)\n_TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo \"yes\" || echo \"no\")\n_TEL_START=$(date +%s)\n_SESSION_ID=\"$$-$(date +%s)\"\necho \"TELEMETRY: ${_TEL:-off}\"\necho \"TEL_PROMPTED: $_TEL_PROMPTED\"\n_EXPLAIN_LEVEL=$(~/.claude/skills/gstack/bin/gstack-config get explain_level 2>/dev/null || echo \"default\")\nif [ \"$_EXPLAIN_LEVEL\" != \"default\" ] && [ \"$_EXPLAIN_LEVEL\" != \"terse\" ]; then _EXPLAIN_LEVEL=\"default\"; fi\necho \"EXPLAIN_LEVEL: $_EXPLAIN_LEVEL\"\n_QUESTION_TUNING=$(~/.claude/skills/gstack/bin/gstack-config get question_tuning 2>/dev/null || echo \"false\")\necho \"QUESTION_TUNING: $_QUESTION_TUNING\"\nmkdir -p ~/.gstack/analytics\nif [ \"$_TEL\" != \"off\" ]; then\necho '{\"skill\":\"browse\",\"ts\":\"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'\",\"repo\":\"'$(basename \"$(git rev-parse --show-toplevel 2>/dev/null)\" 2>/dev/null || echo \"unknown\")'\"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true\nfi\nfor _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do\n  if [ -f \"$_PF\" ]; then\n    if [ \"$_TEL\" != \"off\" ] && [ -x \"~/.claude/skills/gstack/bin/gstack-telemetry-log\" ]; then\n      ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id \"$_SESSION_ID\" 2>/dev/null || true\n    fi\n    rm -f \"$_PF\" 2>/dev/null || true\n  fi\n  break\ndone\neval \"$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)\" 2>/dev/null || true\n_LEARN_FILE=\"${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}/learnings.jsonl\"\nif [ -f \"$_LEARN_FILE\" ]; then\n  _LEARN_COUNT=$(wc -l < \"$_LEARN_FILE\" 2>/dev/null | tr -d ' ')\n  echo \"LEARNINGS: $_LEARN_COUNT entries loaded\"\n  if [ \"$_LEARN_COUNT\" -gt 5 ] 2>/dev/null; then\n    ~/.claude/skills/gstack/bin/gstack-learnings-search --limit 3 2>/dev/null || true\n  fi\nelse\n  echo \"LEARNINGS: 0\"\nfi\n~/.claude/skills/gstack/bin/gstack-timeline-log '{\"skill\":\"browse\",\"event\":\"started\",\"branch\":\"'\"$_BRANCH\"'\",\"session\":\"'\"$_SESSION_ID\"'\"}' 2>/dev/null &\n_HAS_ROUTING=\"no\"\nif [ -f CLAUDE.md ] && grep -q \"## Skill routing\" CLAUDE.md 2>/dev/null; then\n  _HAS_ROUTING=\"yes\"\nfi\n_ROUTING_DECLINED=$(~/.claude/skills/gstack/bin/gstack-config get routing_declined 2>/dev/null || echo \"false\")\necho \"HAS_ROUTING: $_HAS_ROUTING\"\necho \"ROUTING_DECLINED: $_ROUTING_DECLINED\"\n_VENDORED=\"no\"\nif [ -d \".claude/skills/gstack\" ] && [ ! -L \".claude/skills/gstack\" ]; then\n  if [ -f \".claude/skills/gstack/VERSION\" ] || [ -d \".claude/skills/gstack/.git\" ]; then\n    _VENDORED=\"yes\"\n  fi\nfi\necho \"VENDORED_GSTACK: $_VENDORED\"\necho \"MODEL_OVERLAY: claude\"\n_CHECKPOINT_MODE=$(~/.claude/skills/gstack/bin/gstack-config get checkpoint_mode 2>/dev/null || echo \"explicit\")\n_CHECKPOINT_PUSH=$(~/.claude/skills/gstack/bin/gstack-config get checkpoint_push 2>/dev/null || echo \"false\")\necho \"CHECKPOINT_MODE: $_CHECKPOINT_MODE\"\necho \"CHECKPOINT_PUSH: $_CHECKPOINT_PUSH\"\n[ -n \"$OPENCLAW_SESSION\" ] && echo \"SPAWNED_SESSION: true\" || true"
+ },
+ {
+  "id": "n4",
+  "phase": "prologue",
+  "heading": "Artifacts Sync (skill start)",
+  "lines": [
+   274,
+   399
+  ],
+  "cmd": "_GSTACK_HOME=\"${GSTACK_HOME:-$HOME/.gstack}\"\n# Prefer the v1.27.0.0 artifacts file; fall back to brain file for users\n# upgrading mid-stream before the migration script runs.\nif [ -f \"$HOME/.gstack-artifacts-remote.txt\" ]; then\n  _BRAIN_REMOTE_FILE=\"$HOME/.gstack-artifacts-remote.txt\"\nelse\n  _BRAIN_REMOTE_FILE=\"$HOME/.gstack-brain-remote.txt\"\nfi\n_BRAIN_SYNC_BIN=\"~/.claude/skills/gstack/bin/gstack-brain-sync\"\n_BRAIN_CONFIG_BIN=\"~/.claude/skills/gstack/bin/gstack-config\"\n\n# /sync-gbrain context-load: teach the agent to use gbrain when it's available.\n# Per-worktree pin: post-spike redesign uses kubectl-style `.gbrain-source` in the\n# git toplevel to scope queries. Look for the pin in the worktree (not a global\n# state file) so that opening worktree B without a pin doesn't claim \"indexed\"\n# just because worktree A was synced. Empty string when gbrain is not\n# configured (zero context cost for non-gbrain users).\n_GBRAIN_CONFIG=\"$HOME/.gbrain/config.json\"\nif [ -f \"$_GBRAIN_CONFIG\" ] && command -v gbrain >/dev/null 2>&1; then\n  _GBRAIN_VERSION_OK=$(gbrain --version 2>/dev/null | grep -c '^gbrain ' || echo 0)\n  if [ \"$_GBRAIN_VERSION_OK\" -gt 0 ] 2>/dev/null; then\n    _GBRAIN_PIN_PATH=\"\"\n    _REPO_TOP=$(git rev-parse --show-toplevel 2>/dev/null || echo \"\")\n    if [ -n \"$_REPO_TOP\" ] && [ -f \"$_REPO_TOP/.gbrain-source\" ]; then\n      _GBRAIN_PIN_PATH=\"$_REPO_TOP/.gbrain-source\"\n    fi\n    if [ -n \"$_GBRAIN_PIN_PATH\" ]; then\n      echo \"GBrain configured. Prefer \\`gbrain search\\`/\\`gbrain query\\` over Grep for\"\n      echo \"semantic questions; use \\`gbrain code-def\\`/\\`code-refs\\`/\\`code-callers\\` for\"\n      echo \"symbol-aware code lookup. See \\\"## GBrain Search Guidance\\\" in CLAUDE.md.\"\n      echo \"Run /sync-gbrain to refresh.\"\n    else\n      echo \"GBrain configured but this worktree isn't pinned yet. Run \\`/sync-gbrain --full\\`\"\n      echo \"before relying on \\`gbrain search\\` for code questions in this worktree.\"\n      echo \"Falls back to Grep until pinned.\"\n    fi\n  fi\nfi\n\n_BRAIN_SYNC_MODE=$(\"$_BRAIN_CONFIG_BIN\" get artifacts_sync_mode 2>/dev/null || echo off)\n\n# Detect remote-MCP mode (Path 4 of /setup-gbrain). Local artifacts sync is\n# a no-op in remote mode; the brain server pulls from GitHub/GitLab on its\n# own cadence. Read claude.json directly to keep this preamble fast (no\n# subprocess to claude CLI on every skill start).\n_GBRAIN_MCP_MODE=\"none\"\nif command -v jq >/dev/null 2>&1 && [ -f \"$HOME/.claude.json\" ]; then\n  _GBRAIN_MCP_TYPE=$(jq -r '.mcpServers.gbrain.type // .mcpServers.gbrain.transport // empty' \"$HOME/.claude.json\" 2>/dev/null)\n  case \"$_GBRAIN_MCP_TYPE\" in\n    url|http|sse) _GBRAIN_MCP_MODE=\"remote-http\" ;;\n    stdio) _GBRAIN_MCP_MODE=\"local-stdio\" ;;\n  esac\nfi\n\nif [ -f \"$_BRAIN_REMOTE_FILE\" ] && [ ! -d \"$_GSTACK_HOME/.git\" ] && [ \"$_BRAIN_SYNC_MODE\" = \"off\" ]; then\n  _BRAIN_NEW_URL=$(head -1 \"$_BRAIN_REMOTE_FILE\" 2>/dev/null | tr -d '[:space:]')\n  if [ -n \"$_BRAIN_NEW_URL\" ]; then\n    echo \"ARTIFACTS_SYNC: artifacts repo detected: $_BRAIN_NEW_URL\"\n    echo \"ARTIFACTS_SYNC: run 'gstack-brain-restore' to pull your cross-machine artifacts (or 'gstack-config set artifacts_sync_mode off' to dismiss forever)\"\n  fi\nfi\n\nif [ -d \"$_GSTACK_HOME/.git\" ] && [ \"$_BRAIN_SYNC_MODE\" != \"off\" ]; then\n  _BRAIN_LAST_PULL_FILE=\"$_GSTACK_HOME/.brain-last-pull\"\n  _BRAIN_NOW=$(date +%s)\n  _BRAIN_DO_PULL=1\n  if [ -f \"$_BRAIN_LAST_PULL_FILE\" ]; then\n    _BRAIN_LAST=$(cat \"$_BRAIN_LAST_PULL_FILE\" 2>/dev/null || echo 0)\n    _BRAIN_AGE=$(( _BRAIN_NOW - _BRAIN_LAST ))\n    [ \"$_BRAIN_AGE\" -lt 86400 ] && _BRAIN_DO_PULL=0\n  fi\n  if [ \"$_BRAIN_DO_PULL\" = \"1\" ]; then\n    ( cd \"$_GSTACK_HOME\" && git fetch origin >/dev/null 2>&1 && git merge --ff-only \"origin/$(git rev-parse --abbrev-ref HEAD)\" >/dev/null 2>&1 ) || true\n    echo \"$_BRAIN_NOW\" > \"$_BRAIN_LAST_PULL_FILE\"\n  fi\n  \"$_BRAIN_SYNC_BIN\" --once 2>/dev/null || true\nfi\n\nif [ \"$_GBRAIN_MCP_MODE\" = \"remote-http\" ]; then\n  # Remote-MCP mode: local artifacts sync is a no-op (brain admin's server\n  # pulls from GitHub/GitLab). Show the user this is by design, not broken.\n  _GBRAIN_HOST=$(jq -r '.mcpServers.gbrain.url // empty' \"$HOME/.claude.json\" 2>/dev/null | sed -E 's|^https?://([^/:]+).*|\\1|')\n  echo \"ARTIFACTS_SYNC: remote-mode (managed by brain server ${_GBRAIN_HOST:-remote})\"\nelif [ -d \"$_GSTACK_HOME/.git\" ] && [ \"$_BRAIN_SYNC_MODE\" != \"off\" ]; then\n  _BRAIN_QUEUE_DEPTH=0\n  [ -f \"$_GSTACK_HOME/.brain-queue.jsonl\" ] && _BRAIN_QUEUE_DEPTH=$(wc -l < \"$_GSTACK_HOME/.brain-queue.jsonl\" | tr -d ' ')\n  _BRAIN_LAST_PUSH=\"never\"\n  [ -f \"$_GSTACK_HOME/.brain-last-push\" ] && _BRAIN_LAST_PUSH=$(cat \"$_GSTACK_HOME/.brain-last-push\" 2>/dev/null || echo never)\n  echo \"ARTIFACTS_SYNC: mode=$_BRAIN_SYNC_MODE | last_push=$_BRAIN_LAST_PUSH | queue=$_BRAIN_QUEUE_DEPTH\"\nelse\n  echo \"ARTIFACTS_SYNC: off\"\nfi"
+ },
+ {
+  "id": "n5",
+  "phase": "prologue",
+  "heading": "Artifacts Sync (skill start)",
+  "lines": [
+   274,
+   399
+  ],
+  "cmd": "# Chosen mode: full | artifacts-only | off\n\"$_BRAIN_CONFIG_BIN\" set artifacts_sync_mode <choice>\n\"$_BRAIN_CONFIG_BIN\" set artifacts_sync_mode_prompted true"
+ },
+ {
+  "id": "n6",
+  "phase": "prologue",
+  "heading": "Artifacts Sync (skill start)",
+  "lines": [
+   274,
+   399
+  ],
+  "cmd": "\"~/.claude/skills/gstack/bin/gstack-brain-sync\" --discover-new 2>/dev/null || true\n\"~/.claude/skills/gstack/bin/gstack-brain-sync\" --once 2>/dev/null || true"
+ },
+ {
+  "id": "n10",
+  "phase": "prologue",
+  "heading": "SETUP (run this check BEFORE any browse command)",
+  "lines": [
+   484,
+   519
+  ],
+  "cmd": "_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)\nB=\"\"\n[ -n \"$_ROOT\" ] && [ -x \"$_ROOT/.claude/skills/gstack/browse/dist/browse\" ] && B=\"$_ROOT/.claude/skills/gstack/browse/dist/browse\"\n[ -z \"$B\" ] && B=\"$HOME/.claude/skills/gstack/browse/dist/browse\"\nif [ -x \"$B\" ]; then\n  echo \"READY: $B\"\nelse\n  echo \"NEEDS_SETUP\"\nfi"
+ },
+ {
+  "id": "n11",
+  "phase": "prologue",
+  "heading": "SETUP (run this check BEFORE any browse command)",
+  "lines": [
+   484,
+   519
+  ],
+  "cmd": "   if ! command -v bun >/dev/null 2>&1; then\n     BUN_VERSION=\"1.3.10\"\n     BUN_INSTALL_SHA=\"bab8acfb046aac8c72407bdcce903957665d655d7acaa3e11c7c4616beae68dd\"\n     tmpfile=$(mktemp)\n     curl -fsSL \"https://bun.sh/install\" -o \"$tmpfile\"\n     actual_sha=$(shasum -a 256 \"$tmpfile\" | awk '{print $1}')\n     if [ \"$actual_sha\" != \"$BUN_INSTALL_SHA\" ]; then\n       echo \"ERROR: bun install script checksum mismatch\" >&2\n       echo \"  expected: $BUN_INSTALL_SHA\" >&2\n       echo \"  got:      $actual_sha\" >&2\n       rm \"$tmpfile\"; exit 1\n     fi\n     BUN_VERSION=\"$BUN_VERSION\" bash \"$tmpfile\"\n     rm \"$tmpfile\"\n   fi"
+ },
+ {
+  "id": "n8",
+  "phase": "epilogue",
+  "heading": "Operational Self-Improvement",
+  "lines": [
+   436,
+   445
+  ],
+  "cmd": "~/.claude/skills/gstack/bin/gstack-learnings-log '{\"skill\":\"SKILL_NAME\",\"type\":\"operational\",\"key\":\"SHORT_KEY\",\"insight\":\"DESCRIPTION\",\"confidence\":N,\"source\":\"observed\"}'"
+ },
+ {
+  "id": "n9",
+  "phase": "epilogue",
+  "heading": "Telemetry (run last)",
+  "lines": [
+   446,
+   474
+  ],
+  "cmd": "_TEL_END=$(date +%s)\n_TEL_DUR=$(( _TEL_END - _TEL_START ))\nrm -f ~/.gstack/analytics/.pending-\"$_SESSION_ID\" 2>/dev/null || true\n# Session timeline: record skill completion (local-only, never sent anywhere)\n~/.claude/skills/gstack/bin/gstack-timeline-log '{\"skill\":\"SKILL_NAME\",\"event\":\"completed\",\"branch\":\"'$(git branch --show-current 2>/dev/null || echo unknown)'\",\"outcome\":\"OUTCOME\",\"duration_s\":\"'\"$_TEL_DUR\"'\",\"session\":\"'\"$_SESSION_ID\"'\"}' 2>/dev/null || true\n# Local analytics (gated on telemetry setting)\nif [ \"$_TEL\" != \"off\" ]; then\necho '{\"skill\":\"SKILL_NAME\",\"duration_s\":\"'\"$_TEL_DUR\"'\",\"outcome\":\"OUTCOME\",\"browse\":\"USED_BROWSE\",\"session\":\"'\"$_SESSION_ID\"'\",\"ts\":\"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'\"}' >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true\nfi\n# Remote telemetry (opt-in, requires binary)\nif [ \"$_TEL\" != \"off\" ] && [ -x ~/.claude/skills/gstack/bin/gstack-telemetry-log ]; then\n  ~/.claude/skills/gstack/bin/gstack-telemetry-log \\\n    --skill \"SKILL_NAME\" --duration \"$_TEL_DUR\" --outcome \"OUTCOME\" \\\n    --used-browse \"USED_BROWSE\" --session-id \"$_SESSION_ID\" 2>/dev/null &\nfi"
+ }
+]

@@ -1,0 +1,36 @@
+# 运行时状态：激活器的真实数据是本机业务内容，不进仓
+# （examples/task-activator.sample.json 是虚构样例，**要**进仓，别被这条误伤）
+scripts/task-activator.json
+task-activator.json
+*.activator.json
+
+# 本机注入的凭据与环境
+.env
+.env.*
+secrets/
+*.secret
+*-kapi.env
+
+# 浮窗构建产物（任务书明确只搬源码）
+*.app/
+*.dSYM/
+askpanel/build/
+scripts/askpanel/build/
+
+# 日志与备份
+*.log
+*.bak
+*.bak-*
+*.tmp
+
+# Python / macOS
+__pycache__/
+*.pyc
+.DS_Store
+
+# 门禁反例的临时文件（跑门禁自证时会短暂出现）
+tools/_gate_counterexample_tmp.*
+
+# 敏感词表与盐一律不入仓（放 ~/.starfix/，见 tools/scrub-gate.sh 头注）；仓内只留 tools/scrub-terms.sample.txt
+tools/scrub-terms.txt
+tools/scrub-terms.hmac

@@ -1,0 +1,408 @@
+{
+  "version": "v1",
+  "flow": "receipt-compliance",
+  "input_vars": [
+    "receipt",
+    "lines"
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "seq": 1,
+      "kind": "logic",
+      "comment": "分型判断(t0)：综合文件名是否符合变更单号模式(name_pattern)、正文是否含变更单号(has_cs_no)、是否含改动文件清单表(has_file_table)、是否含验收/判决小节(has_verdict_section)，计算出type ∈ {process_log(过程记录/非回执类文档), nondelivery(非交付类回执，如请示/说明), code_delivery(代码交付类回执)}。分型结果决定 r1-r6 各点是否适用(process_log 全部不适用，nondelivery 下 r2/r3/r4 不适用)",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${SCRATCH_DIR}/check.py\" t0 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "classification_field": "doc_type",
+      "cases": {
+        "code_delivery": "code_delivery",
+        "nondelivery": "nondelivery",
+        "process_log": "process_log"
+      }
+    },
+    {
+      "id": "n2",
+      "seq": 2,
+      "kind": "logic",
+      "comment": "判决点e1：统计某类不应出现的模式命中次数(hits)，hits=0 时PASS(与doc_type无关，各类回执均适用)。该步骤调用外部判决脚本 check.py，脚本内部具体识别规则未纳入本次归纳范围",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${SCRATCH_DIR}/check.py\" e1 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "regex:^hits=\\d+/verdict=PASS$",
+      "verdict_point": "e1",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n3",
+      "seq": 3,
+      "kind": "grep",
+      "comment": "统计回执文本中CR(\\r)字符出现次数，供判决点e2使用——e2 未见专属决策步骤，由本步骤的计数值隐式决定(见下方 needs_review 标注)",
+      "stability": "12/12",
+      "type": "tool",
+      "cmd_template": "LC_ALL=C grep -c $'\\r' \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "regex:^cr_count=\\d+$",
+      "on_fail": "fallback",
+      "verdict_point": "e2",
+      "needs_review": "判决点 e2 没有专属的判决步骤，是按结构位置(相邻已认领判决点之间的孤儿工具步骤)补齐推断出来的决策来源；样本内该步骤自身的计数值从未取到过会导向FAIL 的取值，无法从当前 12 轮数据统计验证真实的机械判决门槛，仅能类推自字段名的常识含义，建议人工核实"
+    },
+    {
+      "id": "n4",
+      "seq": 4,
+      "kind": "logic",
+      "comment": "判决点r1：状态字段(status_found)存在且无含糊措辞(hedge_found)-> PASS，否则 FAIL(与doc_type无关，两类回执均适用)",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${SCRATCH_DIR}/check.py\" r1 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "r1",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS",
+        "N/A": "N/A"
+      },
+      "no_match": "fallback",
+      "depends_on": [
+        "n1"
+      ]
+    },
+    {
+      "id": "n5",
+      "seq": 5,
+      "kind": "grep",
+      "comment": "统计回执中出现的40位十六进制commit hash个数，供判决点r2使用——r2 未见专属决策步骤，由本步骤的计数值隐式决定(见下方 needs_review 标注)",
+      "stability": "12/12",
+      "type": "tool",
+      "cmd_template": "grep -oE '[0-9a-f]{{40}}' \"{receipt}\" | wc -l",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "regex:^sha\\d+_count=\\d+$",
+      "on_fail": "fallback",
+      "verdict_point": "r2",
+      "depends_on": [
+        "n1"
+      ],
+      "needs_review": "判决点 r2 没有专属的判决步骤，是按结构位置(相邻已认领判决点之间的孤儿工具步骤)补齐推断出来的决策来源；样本内该步骤自身的计数值从未取到过会导向FAIL 的取值，无法从当前 12 轮数据统计验证真实的机械判决门槛，仅能类推自字段名的常识含义，建议人工核实"
+    },
+    {
+      "id": "n6",
+      "seq": 6,
+      "kind": "logic",
+      "comment": "判决点r3(仅code_delivery适用)：同时命中分支(has_branch)与工作树(has_worktree)关键字 -> PASS，否则 FAIL；process_log/nondelivery类型记N/A",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${SCRATCH_DIR}/check.py\" r3 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "r3",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "N/A": "N/A"
+      },
+      "no_match": "fallback",
+      "depends_on": [
+        "n1"
+      ]
+    },
+    {
+      "id": "n7",
+      "seq": 7,
+      "kind": "grep",
+      "comment": "统计回执中出现的具体代码文件路径个数，供判决点r4使用——r4 未见专属决策步骤，由本步骤的计数值隐式决定(见下方 needs_review 标注)",
+      "stability": "12/12",
+      "type": "tool",
+      "cmd_template": "grep -oE '[A-Za-z0-9_./-]+\\.(java|vue|ts|js|sql|md|yml|yaml|json|cjs|sh|py|css)' \"{receipt}\" | wc -l",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "regex:^file_path_count=\\d+$",
+      "on_fail": "fallback",
+      "verdict_point": "r4",
+      "depends_on": [
+        "n1"
+      ],
+      "needs_review": "判决点 r4 没有专属的判决步骤，是按结构位置(相邻已认领判决点之间的孤儿工具步骤)补齐推断出来的决策来源；样本内该步骤自身的计数值从未取到过会导向FAIL 的取值，无法从当前 12 轮数据统计验证真实的机械判决门槛，仅能类推自字段名的常识含义，建议人工核实"
+    },
+    {
+      "id": "n8",
+      "seq": 8,
+      "kind": "logic",
+      "comment": "判决点r5：存在代码围栏(has_fence)或图片/截图引用(has_image)之一 -> PASS，否则 FAIL(与doc_type无关，两类回执均适用)",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${SCRATCH_DIR}/check.py\" r5 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "r5",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "N/A": "N/A"
+      },
+      "no_match": "fallback",
+      "depends_on": [
+        "n1"
+      ]
+    },
+    {
+      "id": "n9",
+      "seq": 9,
+      "kind": "logic",
+      "comment": "判决点r6：检测是否命中打回/退回/整改类小节标题(trigger)，未命中 -> N/A；命中后进一步检查该小节内是否给出新的commit哈希(has_sha)或提交引用(has_commit_ref)——脚本自身在两者皆无时直接判定 AMBIGUOUS(而不是强行判FAIL)，这是判决脚本自带的'说不准就交出来'终值，不是本归纳器分出来的桶。样本CS-<日期>-REVASSOC(round6)命中trigger但缺锚点，脚本判AMBIGUOUS，见n9_llm 兜底节点",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${SCRATCH_DIR}/check.py\" r6 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "r6",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "N/A": "N/A"
+      },
+      "no_match": "n9_llm"
+    },
+    {
+      "id": "n9_llm",
+      "type": "llm",
+      "verdict_point": "r6",
+      "comment": "判决点 r6 的机械判决脚本(n9)自己在观测样本里就产出过 ['AMBIGUOUS'] 这类非 PASS/FAIL/N-A 的终值——这不是本归纳器强行分出来的桶，是轨迹数据本身记录的脚本自我判断结果，说明这类样本连机械脚本自己都认为无法直接裁定，需要移交模型/人工复核，而不是由本归纳器杜撰一条机械规则把它们并入 PASS 或 FAIL。",
+      "purpose": "解读 n9 输出为 ['AMBIGUOUS'] 的样本，判断 r6 的最终 PASS/FAIL，并给出理由",
+      "context": [
+        "n9.output"
+      ],
+      "ambiguous_examples": [
+        {
+          "round": 6,
+          "input": {
+            "receipt": "${FLEET_HOME}/<项目>ERP/迁移备份/回执/CS-<日期>-REVASSOC.md",
+            "lines": 66
+          },
+          "step_output": "trigger=True/reason=heading@line54/has_sha=False/has_commit_ref=False/verdict=AMBIGUOUS",
+          "mechanical_verdict": "AMBIGUOUS",
+          "fail_detail": "r6触发打回追加节但节内缺新提交锚点，节结构存在但残缺，标AMBIGUOUS不自行裁定"
+        }
+      ]
+    }
+  ],
+  "verdict_rules": [
+    {
+      "point": "e1",
+      "depends_on": [
+        "n2"
+      ],
+      "decision_node": "n2",
+      "stability": "12/12",
+      "type": "mechanical",
+      "comment": "e1 完全由 n2 的输出机械决定，12 轮观测 12/12 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "e2",
+      "depends_on": [
+        "n3"
+      ],
+      "decision_node": "n3",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "needs_review": "e2 没有专属判决步骤，决策来源由结构位置(相邻孤儿工具步骤)补齐推断，具体判决门槛未经数据统计验证",
+      "comment": "e2 没有专属判决步骤，决策来源由结构位置(相邻孤儿工具步骤)补齐推断，具体判决门槛未经数据统计验证。"
+    },
+    {
+      "point": "r1",
+      "depends_on": [
+        "n1",
+        "n4"
+      ],
+      "decision_node": "n4",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery",
+          "nondelivery"
+        ]
+      },
+      "comment": "r1 仅在 doc_type∈['code_delivery', 'nondelivery'] 时适用(doc_type∈['process_log'] 时记 N/A)，无需模型介入。"
+    },
+    {
+      "point": "r2",
+      "depends_on": [
+        "n1",
+        "n5"
+      ],
+      "decision_node": "n5",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery"
+        ]
+      },
+      "needs_review": "r2 没有专属判决步骤，决策来源由结构位置(相邻孤儿工具步骤)补齐推断，具体判决门槛未经数据统计验证",
+      "comment": "r2 仅在 doc_type∈['code_delivery'] 时适用(doc_type∈['nondelivery', 'process_log'] 时记 N/A)；r2 没有专属判决步骤，决策来源由结构位置(相邻孤儿工具步骤)补齐推断，具体判决门槛未经数据统计验证。"
+    },
+    {
+      "point": "r3",
+      "depends_on": [
+        "n1",
+        "n6"
+      ],
+      "decision_node": "n6",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery"
+        ]
+      },
+      "comment": "r3 仅在 doc_type∈['code_delivery'] 时适用(doc_type∈['nondelivery', 'process_log'] 时记 N/A)，无需模型介入。"
+    },
+    {
+      "point": "r4",
+      "depends_on": [
+        "n1",
+        "n7"
+      ],
+      "decision_node": "n7",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery"
+        ]
+      },
+      "needs_review": "r4 没有专属判决步骤，决策来源由结构位置(相邻孤儿工具步骤)补齐推断，具体判决门槛未经数据统计验证",
+      "comment": "r4 仅在 doc_type∈['code_delivery'] 时适用(doc_type∈['nondelivery', 'process_log'] 时记 N/A)；r4 没有专属判决步骤，决策来源由结构位置(相邻孤儿工具步骤)补齐推断，具体判决门槛未经数据统计验证。"
+    },
+    {
+      "point": "r5",
+      "depends_on": [
+        "n1",
+        "n8"
+      ],
+      "decision_node": "n8",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery",
+          "nondelivery"
+        ]
+      },
+      "comment": "r5 仅在 doc_type∈['code_delivery', 'nondelivery'] 时适用(doc_type∈['process_log'] 时记 N/A)，无需模型介入。"
+    },
+    {
+      "point": "r6",
+      "depends_on": [
+        "n9"
+      ],
+      "decision_node": "n9",
+      "stability": "12/12",
+      "type": "llm",
+      "comment": "r6 的判决脚本(n9)自己在观测样本里产出过 ['AMBIGUOUS'] 这类非 PASS/FAIL/N-A 的终值——这是轨迹数据本身记录的脚本自我判断结果，不是本归纳器分出来的桶，说明这类样本连机械脚本自己都认为无法直接裁定。因此该终值分支移交 n9_llm 模型/人工复核，不由本归纳器杜撰机械规则把它们并入 PASS 或 FAIL。",
+      "mechanical_shortcut": "n9 输出为 PASS/FAIL 时直接采信，无需模型",
+      "llm_node": "n9_llm"
+    }
+  ],
+  "fallback": {
+    "action": "spawn_model",
+    "context": [
+      "run_history",
+      "current_node",
+      "matched_trajectory_ref"
+    ]
+  },
+  "classification": {
+    "field": "doc_type",
+    "decision_node": "n1",
+    "own_output_key": "type",
+    "values": [
+      "code_delivery",
+      "nondelivery",
+      "process_log"
+    ],
+    "gates": {
+      "r1": [
+        "code_delivery",
+        "nondelivery"
+      ],
+      "r2": [
+        "code_delivery"
+      ],
+      "r3": [
+        "code_delivery"
+      ],
+      "r4": [
+        "code_delivery"
+      ],
+      "r5": [
+        "code_delivery",
+        "nondelivery"
+      ]
+    },
+    "criteria": "由 n1(t0) 内部综合 name_pattern/has_cs_no/has_file_table/has_verdict_section 计算，具体布尔组合未在轨迹内单独暴露(判决脚本内部逻辑)，只能确认三种取值与最终 r1-r6 的适用范围强相关(process_log 时 r1-r6 全部N/A；nondelivery 时仅 r2/r3/r4 记N/A；code_delivery 时全部适用)，具体分型布尔式建议人工核实 check.py 源码"
+  },
+  "revision_log": [
+    {
+      "rev": "v1",
+      "date": "<日期>",
+      "by": "通用化归纳器(inducer/induce.py 通用引擎)自动产出",
+      "changes": "对 receipt-compliance 当前 12 轮轨迹(9步/轮，check.py 判决脚本结构)归纳产出。t0 分型(process_log/nondelivery/code_delivery)与 r1-r6 的条件适用均由算法从数据统计发现(N/A 与 doc_type 的相关性在样本内无反例)；e2/r2/r4 没有专属判决步骤，由算法按结构位置从相邻孤儿工具步骤补齐，具体判决门槛未经数据统计验证，标记needs_review；r6 判决脚本自身会产出 AMBIGUOUS 终值(样本 CS-<日期>-REVASSOC 命中)，已按通用规则自动路由到 llm 兜底节点，不属于本归纳器手工覆写。"
+    }
+  ]
+}

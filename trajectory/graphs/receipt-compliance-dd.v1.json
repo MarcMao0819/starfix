@@ -1,0 +1,444 @@
+{
+  "version": "dd.v1",
+  "flow": "receipt-compliance",
+  "input_vars": [
+    "receipt",
+    "lines"
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "seq": 1,
+      "kind": "logic",
+      "comment": "分型判断(t0)：综合文件名是否符合变更单号模式(name_pattern)、正文是否含变更单号(has_cs_no)、是否含改动文件清单表(has_file_table)、是否含验收/判决小节(has_verdict_section)，计算出type ∈ {process_log(过程记录/非回执类文档), nondelivery(非交付类回执，如请示/说明), code_delivery(代码交付类回执)}。分型结果决定 r1-r6 各点是否适用(process_log 全部不适用，nondelivery 下 r2/r3/r4 不适用)",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" t0 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "classification_field": "doc_type",
+      "cases": {
+        "code_delivery": "code_delivery",
+        "nondelivery": "nondelivery",
+        "process_log": "process_log"
+      }
+    },
+    {
+      "id": "n2",
+      "seq": 2,
+      "kind": "logic",
+      "comment": "判决点e1：统计某类不应出现的模式命中次数(hits)，hits=0 时PASS(与doc_type无关，各类回执均适用)。该步骤调用外部判决脚本 check.py，脚本内部具体识别规则未纳入本次归纳范围",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" e1 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "regex:^hits=\\d+/verdict=PASS$",
+      "verdict_point": "e1",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n3",
+      "seq": 3,
+      "kind": "logic",
+      "comment": "判决点e2：CR 计数为 0 即 PASS，>0 即 FAIL（门槛取自受版本控制的检查脚本源码，非样本推断）。原 v1 用裸 grep 统计，已改为脚本内 Python 实现——本机 grep 是 ugrep 函数包装，与子进程行为不一致会产生假阴性。",
+      "stability": "12/12",
+      "type": "branch",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" e2 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "regex:^cr_count=\\d+/verdict=(PASS|FAIL)$",
+      "verdict_point": "e2",
+      "exec": "logic",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "FAIL": "FAIL",
+        "N/A": "N/A"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n4",
+      "seq": 4,
+      "kind": "logic",
+      "comment": "判决点r1：状态字段(status_found)存在且无含糊措辞(hedge_found)-> PASS，否则 FAIL(与doc_type无关，两类回执均适用)",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" r1 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "r1",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "FAIL": "FAIL",
+        "PASS": "PASS",
+        "N/A": "N/A"
+      },
+      "no_match": "fallback",
+      "depends_on": [
+        "n1"
+      ]
+    },
+    {
+      "id": "n5",
+      "seq": 5,
+      "kind": "logic",
+      "comment": "判决点r2：至少 1 个 40 位提交号即 PASS，0 个即 FAIL（门槛取自受版本控制的检查脚本源码，非样本推断）。原 v1 用裸 grep 统计，已改为脚本内 Python 实现——本机 grep 是 ugrep 函数包装，与子进程行为不一致会产生假阴性。",
+      "stability": "12/12",
+      "type": "branch",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" r2 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "regex:^sha40_count=\\d+/verdict=(PASS|FAIL)$",
+      "verdict_point": "r2",
+      "depends_on": [
+        "n1"
+      ],
+      "exec": "logic",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "FAIL": "FAIL",
+        "N/A": "N/A"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n6",
+      "seq": 6,
+      "kind": "logic",
+      "comment": "判决点r3(仅code_delivery适用)：同时命中分支(has_branch)与工作树(has_worktree)关键字 -> PASS，否则 FAIL；process_log/nondelivery类型记N/A ★dd.v1 补机械 FAIL 支：原 cases 只有 PASS/N/A，机械判 FAIL 落 no_match→兜给模型，而本判点是纯机械布尔（有无 worktree/分支字样、有无代码围栏或图片），无判断余地。实测 DD-96 的 r3、DD-99 的 r5 机械判据均为 FAIL，模型却答 PASS——判决被模型的随机性接管。补上 FAIL 支后该判点不再调用模型。",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" r3 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "r3",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "N/A": "N/A",
+        "FAIL": "FAIL"
+      },
+      "no_match": "fallback",
+      "depends_on": [
+        "n1"
+      ]
+    },
+    {
+      "id": "n7",
+      "seq": 7,
+      "kind": "logic",
+      "comment": "判决点r4：至少 1 个精确文件路径即 PASS，0 个即 FAIL（门槛取自受版本控制的检查脚本源码，非样本推断）。原 v1 用裸 grep 统计，已改为脚本内 Python 实现——本机 grep 是 ugrep 函数包装，与子进程行为不一致会产生假阴性。",
+      "stability": "12/12",
+      "type": "branch",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" r4 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "regex:^file_path_count=\\d+/verdict=(PASS|FAIL)$",
+      "verdict_point": "r4",
+      "depends_on": [
+        "n1"
+      ],
+      "exec": "logic",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "FAIL": "FAIL",
+        "N/A": "N/A"
+      },
+      "no_match": "fallback"
+    },
+    {
+      "id": "n8",
+      "seq": 8,
+      "kind": "logic",
+      "comment": "判决点r5：存在代码围栏(has_fence)或图片/截图引用(has_image)之一 -> PASS，否则 FAIL(与doc_type无关，两类回执均适用) ★dd.v1 补机械 FAIL 支：原 cases 只有 PASS/N/A，机械判 FAIL 落 no_match→兜给模型，而本判点是纯机械布尔（有无 worktree/分支字样、有无代码围栏或图片），无判断余地。实测 DD-96 的 r3、DD-99 的 r5 机械判据均为 FAIL，模型却答 PASS——判决被模型的随机性接管。补上 FAIL 支后该判点不再调用模型。",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" r5 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "r5",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "PASS": "PASS",
+        "N/A": "N/A",
+        "FAIL": "FAIL"
+      },
+      "no_match": "fallback",
+      "depends_on": [
+        "n1"
+      ]
+    },
+    {
+      "id": "n9",
+      "seq": 9,
+      "kind": "logic",
+      "comment": "判决点r6：检测是否命中打回/退回/整改类小节标题(trigger)，未命中 -> N/A；命中后进一步检查该小节内是否给出新的commit哈希(has_sha)或提交引用(has_commit_ref)——脚本自身在两者皆无时直接判定 AMBIGUOUS(而不是强行判FAIL)，这是判决脚本自带的'说不准就交出来'终值，不是本归纳器分出来的桶。样本CS-<日期>-REVASSOC(round6)命中trigger但缺锚点，脚本判AMBIGUOUS，见n9_llm 兜底节点",
+      "stability": "12/12",
+      "type": "branch",
+      "exec": "logic",
+      "cmd_template": "python3 \"${TRAJ_HOME}/runner/checks/receipt_checks_dd.py\" r6 \"{receipt}\"",
+      "bindings": {
+        "receipt": {
+          "from": "input.receipt"
+        }
+      },
+      "output_contract": "nonempty",
+      "verdict_point": "r6",
+      "predicate": "mechanical_signal_from_own_output(point_key)",
+      "cases": {
+        "N/A": "N/A"
+      },
+      "no_match": "n9_llm"
+    },
+    {
+      "id": "n9_llm",
+      "type": "llm",
+      "verdict_point": "r6",
+      "comment": "判决点 r6 的机械判决脚本(n9)自己在观测样本里就产出过 ['AMBIGUOUS'] 这类非 PASS/FAIL/N-A 的终值——这不是本归纳器强行分出来的桶，是轨迹数据本身记录的脚本自我判断结果，说明这类样本连机械脚本自己都认为无法直接裁定，需要移交模型/人工复核，而不是由本归纳器杜撰一条机械规则把它们并入 PASS 或 FAIL。",
+      "purpose": "解读 n9 输出为 ['AMBIGUOUS'] 的样本，判断 r6 的最终 PASS/FAIL，并给出理由",
+      "context": [
+        "n9.output"
+      ],
+      "ambiguous_examples": [
+        {
+          "round": 6,
+          "input": {
+            "receipt": "${FLEET_HOME}/<项目>ERP/迁移备份/回执/CS-<日期>-REVASSOC.md",
+            "lines": 66
+          },
+          "step_output": "trigger=True/reason=heading@line54/has_sha=False/has_commit_ref=False/verdict=AMBIGUOUS",
+          "mechanical_verdict": "AMBIGUOUS",
+          "fail_detail": "r6触发打回追加节但节内缺新提交锚点，节结构存在但残缺，标AMBIGUOUS不自行裁定"
+        }
+      ]
+    }
+  ],
+  "verdict_rules": [
+    {
+      "point": "e1",
+      "depends_on": [
+        "n2"
+      ],
+      "decision_node": "n2",
+      "stability": "12/12",
+      "type": "mechanical",
+      "comment": "e1 完全由 n2 的输出机械决定，12 轮观测 12/12 一致，无反例，无需模型介入。"
+    },
+    {
+      "point": "e2",
+      "depends_on": [
+        "n3"
+      ],
+      "decision_node": "n3",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "comment": "e2 没有专属判决步骤，决策来源由结构位置(相邻孤儿工具步骤)补齐推断，具体判决门槛未经数据统计验证。；判决门槛已由脚本源码确认，非样本推断。",
+      "threshold_source": "runner/checks/receipt_checks.py（已入库，git 可审计）"
+    },
+    {
+      "point": "r1",
+      "depends_on": [
+        "n1",
+        "n4"
+      ],
+      "decision_node": "n4",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery",
+          "nondelivery"
+        ]
+      },
+      "comment": "r1 仅在 doc_type∈['code_delivery', 'nondelivery'] 时适用(doc_type∈['process_log'] 时记 N/A)，无需模型介入。"
+    },
+    {
+      "point": "r2",
+      "depends_on": [
+        "n1",
+        "n5"
+      ],
+      "decision_node": "n5",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery"
+        ]
+      },
+      "comment": "r2 仅在 doc_type∈['code_delivery'] 时适用(doc_type∈['nondelivery', 'process_log'] 时记 N/A)；判决门槛已由脚本源码确认，非样本推断。",
+      "threshold_source": "runner/checks/receipt_checks.py（已入库，git 可审计）"
+    },
+    {
+      "point": "r3",
+      "depends_on": [
+        "n1",
+        "n6"
+      ],
+      "decision_node": "n6",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery"
+        ]
+      },
+      "comment": "r3 仅在 doc_type∈['code_delivery'] 时适用(doc_type∈['nondelivery', 'process_log'] 时记 N/A)，无需模型介入。"
+    },
+    {
+      "point": "r4",
+      "depends_on": [
+        "n1",
+        "n7"
+      ],
+      "decision_node": "n7",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery"
+        ]
+      },
+      "comment": "r4 仅在 doc_type∈['code_delivery'] 时适用(doc_type∈['nondelivery', 'process_log'] 时记 N/A)；判决门槛已由脚本源码确认，非样本推断。",
+      "threshold_source": "runner/checks/receipt_checks.py（已入库，git 可审计）"
+    },
+    {
+      "point": "r5",
+      "depends_on": [
+        "n1",
+        "n8"
+      ],
+      "decision_node": "n8",
+      "stability": "12/12",
+      "type": "mechanical",
+      "conditional": true,
+      "applicable_when": {
+        "doc_type": [
+          "code_delivery",
+          "nondelivery"
+        ]
+      },
+      "comment": "r5 仅在 doc_type∈['code_delivery', 'nondelivery'] 时适用(doc_type∈['process_log'] 时记 N/A)，无需模型介入。"
+    },
+    {
+      "point": "r6",
+      "depends_on": [
+        "n9"
+      ],
+      "decision_node": "n9",
+      "stability": "12/12",
+      "type": "llm",
+      "comment": "r6 的判决脚本(n9)自己在观测样本里产出过 ['AMBIGUOUS'] 这类非 PASS/FAIL/N-A 的终值——这是轨迹数据本身记录的脚本自我判断结果，不是本归纳器分出来的桶，说明这类样本连机械脚本自己都认为无法直接裁定。因此该终值分支移交 n9_llm 模型/人工复核，不由本归纳器杜撰机械规则把它们并入 PASS 或 FAIL。",
+      "mechanical_shortcut": "n9 输出为 PASS/FAIL 时直接采信，无需模型",
+      "llm_node": "n9_llm"
+    }
+  ],
+  "fallback": {
+    "action": "spawn_model",
+    "context": [
+      "run_history",
+      "current_node",
+      "matched_trajectory_ref"
+    ]
+  },
+  "classification": {
+    "field": "doc_type",
+    "decision_node": "n1",
+    "own_output_key": "type",
+    "values": [
+      "code_delivery",
+      "nondelivery",
+      "process_log"
+    ],
+    "gates": {
+      "r1": [
+        "code_delivery",
+        "nondelivery"
+      ],
+      "r2": [
+        "code_delivery"
+      ],
+      "r3": [
+        "code_delivery"
+      ],
+      "r4": [
+        "code_delivery"
+      ],
+      "r5": [
+        "code_delivery",
+        "nondelivery"
+      ]
+    },
+    "criteria": "分型布尔式实现于 runner/checks/receipt_checks_dd.py 的 check_t0（已入库可审计）：process_log = 文件名含步骤/日志模式 或 (行数>800 且无判决小节)；code_delivery = (has_cs_no 或 has_changeset_id) 且 (has_file_table 或 has_manifest_heading)；其余 nondelivery。★ DD 族两处放宽：①单号识别接受 <跳板机> 侧 t_code_changeset 自增 id 的 `^changeset_id=<数字>$` 独占行；②清单识别接受「清单区段标记」（改动文件/新建文件/文件清单… 独占一行的小节标题），不再要求区段里含合法文件路径——原口径下 has_file_table 成立必然蕴含 r4 成立，**r4 的 FAIL 分支结构上不可达**，解耦后才可达（DD-95 为其反例）。"
+  },
+  "revision_log": [
+    {
+      "rev": "v1",
+      "date": "<日期>",
+      "by": "通用化归纳器(inducer/induce.py 通用引擎)自动产出",
+      "changes": "对 receipt-compliance 当前 12 轮轨迹(9步/轮，check.py 判决脚本结构)归纳产出。t0 分型(process_log/nondelivery/code_delivery)与 r1-r6 的条件适用均由算法从数据统计发现(N/A 与 doc_type 的相关性在样本内无反例)；e2/r2/r4 没有专属判决步骤，由算法按结构位置从相邻孤儿工具步骤补齐，具体判决门槛未经数据统计验证，标记needs_review；r6 判决脚本自身会产出 AMBIGUOUS 终值(样本 CS-<日期>-REVASSOC 命中)，已按通用规则自动路由到 llm 兜底节点，不属于本归纳器手工覆写。"
+    },
+    {
+      "rev": "v2",
+      "date": "<日期>",
+      "by": "主会话人工审图",
+      "changes": "①致命修复：全部节点的判据脚本路径由会话临时目录(scratchpad)改为受版本控制的 runner/checks/receipt_checks.py 并入库——原图依赖临时文件，清理后即不可执行、换机器无法复现；②e2/r2/r4 三处 needs_review 消除：真实门槛取自脚本源码(CR=0 / ≥1个40位sha / ≥1个文件路径)，并由裸 grep 统计步骤改为脚本内 Python 实现，规避本机 grep 包装(ugrep)导致的假阴性(今日已致两起真实误报)；③n5 output_contract 修正：sha40_count 中的 40 原被推断为可变数字，契约过松；④补分型判据溯源与只读/禁裸grep约定"
+    },
+    {
+      "rev": "dd.v1",
+      "date": "<日期>",
+      "by": "轨迹窗承建（抖店舰队 DD-00 派单，Owner 裁定；适用边界：本图判的是回执文件本身，环境无关）",
+      "changes": "DD 族（抖店舰队）回执适配，**只新建、不改动 v2 与其判据脚本**。【问题】DD 回执用 <跳板机> 侧 t_code_changeset 自增 id，正文写 `changeset_id=<数字>` 独占行，没有 CS-YYYYMMDD-NNNN；原分型要求 has_cs_no，DD 回执一律落 nondelivery，r2/r3/r4（锚点 sha / worktree+分支 / 文件清单）三点被门控掉根本吃不到。【改法】新建 runner/checks/receipt_checks_dd.py（只改 check_t0，e1/e2/r1-r6 逐字照抄），本图各节点 cmd_template 指向该脚本；flow 保持 \"receipt-compliance\" 不动运行器。【与发单建议的差异，及理由】发单方建议 code_delivery=(CS单号 或 changeset_id) 且 has_file_table。照此会留下死分支：has_file_table 判「列表项含合法文件路径」，r4 判「全文含合法文件路径」，**前者成立必然蕴含后者成立**，故凡被分型收进 code_delivery 的文档 r4 必 PASS，r4 的 FAIL 分支结构上不可达。（该缺陷对现有 v2 同样成立，v2 是生产件本单不碰，仅上报。）按硬约定 6/11 改为解耦：分型问「是否自称代码交付」→ 看清单区段标记；r4 问「是否给出路径证据」→ 照旧全文找路径。二者不再互相蕴含。has_file_table 仍保留在析取式里，老形态（有路径列表、无小节标题）照旧成立。【取证】五份 fixture：97 干净→code_delivery 且 r2/r3/r4 全 PASS；98→仅 r1 FAIL；99→e1/e2/r1/r5 FAIL；96（无 40 位 sha、无 worktree/分支）→r2/r3 FAIL；95（自称交付但零文件路径）→r4 FAIL。【适用边界】本图判的是回执文件本身（乱码/行尾/状态含糊/证据围栏/锚点字样），与仓库环境无关，故对<基座项目>线同样有效；另三张图（changeset-audit/premerge-gate/cleanup-audit）判据绑本机仓与本地库，**不适用于<基座项目>/<跳板机> 目标，本单未做任何此类扩展**。 【施工中另查出并在本图修掉的缺陷】n6(r3)/n8(r5) 的 cases 只映射 PASS 与 N/A，机械判 FAIL 会落 no_match 兜给模型：实测 DD-96 的 r3、DD-99 的 r5 机械判据都是 FAIL，模型却答 PASS，即**这两个判点的 FAIL 结论由模型随机性接管**。二者是纯机械布尔，无判断余地，故补 FAIL 支。（同类未补的还有 n2(e1) 与 n9(r6)：e1 的乱码正则确有误伤合法外文字符的风险，留模型兜是合理的，本次实测模型判对；r6 在全部 DD fixture 下均为 N/A 未触发。此二者的 FAIL/AMBIGUOUS 支仍是模型决定，**v2 同样如此**，一并上报归属线自行拍板。）"
+    }
+  ],
+  "conventions": {
+    "readonly_guard": "本图全部节点为只读检查（读回执文本），不写任何文件与数据库",
+    "no_bare_grep": "禁用裸 grep：本机 grep 是 shell 函数包装(ugrep)，与子进程系统 grep 行为不一致，存在性检查会假阴性。判据一律走 receipt_checks.py 的 Python 实现"
+  }
+}

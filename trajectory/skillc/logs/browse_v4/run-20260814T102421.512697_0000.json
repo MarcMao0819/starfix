@@ -1,0 +1,234 @@
+{
+ "skill": "browse_v4",
+ "result": {
+  "ts": "<日期>T10:24:21.512697+00:00",
+  "blocks_total": 20,
+  "executed": 10,
+  "failed": 1,
+  "skipped_by_guard": 4,
+  "not_a_command": 1,
+  "authorized_at_compile": 4,
+  "halted_at": null,
+  "emitted_tokens": [
+   "TEL_PROMPTED",
+   "VENDORED_GSTACK"
+  ],
+  "results": [
+   {
+    "id": "b1",
+    "kind": "branch",
+    "status": "OK",
+    "rc": 0,
+    "ms": 147,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": [
+     "TEL_PROMPTED",
+     "VENDORED_GSTACK"
+    ]
+   },
+   {
+    "id": "b2",
+    "kind": "human_gate",
+    "status": "AUTHORIZED_AT_COMPILE",
+    "why": "编译期已授权（a1=yes，应答人 owner）"
+   },
+   {
+    "id": "b3",
+    "kind": "human_gate",
+    "status": "AUTHORIZED_AT_COMPILE",
+    "why": "编译期已授权（a2=no，应答人 owner）"
+   },
+   {
+    "id": "b4",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 164,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b5",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 258,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b6",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "条件 TEL_PROMPTED=yes 不等于期望 no"
+   },
+   {
+    "id": "b7",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 298,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b8",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 207,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b9",
+    "kind": "human_gate",
+    "status": "AUTHORIZED_AT_COMPILE",
+    "why": "编译期已授权（a3=no，应答人 owner）"
+   },
+   {
+    "id": "b10",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "条件 VENDORED_GSTACK=no 不等于期望 yes"
+   },
+   {
+    "id": "b11",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 242,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b12",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 244,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b13",
+    "kind": "human_gate",
+    "status": "AUTHORIZED_AT_COMPILE",
+    "why": "编译期已授权（a4=no，应答人 owner）"
+   },
+   {
+    "id": "b14",
+    "kind": "cmd",
+    "status": "NOT_A_COMMAND",
+    "why": "bash -n 不解析，判定该围栏不是命令：/var/folders/pk/7tfwj29d7tvdfd5kk31ypm680000gn/T/tmp4gli7f0z.sh: line 2: syntax error near unexpected token `newline'"
+   },
+   {
+    "id": "b15",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 240,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b16",
+    "kind": "cmd",
+    "status": "FAILED",
+    "rc": 127,
+    "ms": 275,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b17",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 272,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b18",
+    "kind": "branch",
+    "status": "OK",
+    "rc": 0,
+    "ms": 281,
+    "out_tail": [
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off",
+     "READY: ${FLEET_HOME}/.claude/skills/gstack/browse/dist/browse"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b19",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'NEEDS_SETUP' 未成立（已回显令牌: TEL_PROMPTED, VENDORED_GSTACK）"
+   },
+   {
+    "id": "b20",
+    "kind": "cmd",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'NEEDS_SETUP' 未成立（已回显令牌: TEL_PROMPTED, VENDORED_GSTACK）"
+   }
+  ]
+ },
+ "canary": {
+  "verdict": "BASELINE_WRITTEN",
+  "diffs": []
+ }
+}

@@ -1,0 +1,207 @@
+{
+ "skill": "browse",
+ "result": {
+  "ts": "<日期>T09:36:36.802272+00:00",
+  "blocks_total": 15,
+  "executed": 10,
+  "failed": 2,
+  "skipped_by_guard": 3,
+  "halted_at": null,
+  "emitted_tokens": [],
+  "results": [
+   {
+    "id": "b1",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 130,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b2",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 128,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b3",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 174,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b4",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 210,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b5",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 190,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b6",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'A' 未成立（已回显令牌: 无）"
+   },
+   {
+    "id": "b7",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 223,
+    "out_tail": [
+     "MODEL_OVERLAY: claude",
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b8",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 217,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b9",
+    "kind": "cmd",
+    "status": "FAILED",
+    "rc": 2,
+    "ms": 223,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [
+     "/var/folders/pk/7tfwj29d7tvdfd5kk31ypm680000gn/T/tmph6_nprfg.sh: line 177: syntax error near unexpected token `newline'",
+     "/var/folders/pk/7tfwj29d7tvdfd5kk31ypm680000gn/T/tmph6_nprfg.sh: line 177: `\"$_BRAIN_CONFIG_BIN\" set artifacts_sync_mode <choice>'"
+    ],
+    "emitted": []
+   },
+   {
+    "id": "b10",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 219,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b11",
+    "kind": "cmd",
+    "status": "FAILED",
+    "rc": 127,
+    "ms": 240,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b12",
+    "kind": "cmd",
+    "status": "OK",
+    "rc": 0,
+    "ms": 279,
+    "out_tail": [
+     "CHECKPOINT_MODE: explicit",
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b13",
+    "kind": "branch",
+    "status": "OK",
+    "rc": 0,
+    "ms": 310,
+    "out_tail": [
+     "CHECKPOINT_PUSH: false",
+     "ARTIFACTS_SYNC: off",
+     "READY: ${FLEET_HOME}/.claude/skills/gstack/browse/dist/browse"
+    ],
+    "err_tail": [],
+    "emitted": []
+   },
+   {
+    "id": "b14",
+    "kind": "human_gate",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'NEEDS_SETUP' 未成立（已回显令牌: 无）"
+   },
+   {
+    "id": "b15",
+    "kind": "cmd",
+    "status": "SKIPPED_BY_GUARD",
+    "why": "守卫 'NEEDS_SETUP' 未成立（已回显令牌: 无）"
+   }
+  ]
+ },
+ "canary": {
+  "verdict": "MATCH",
+  "diffs": []
+ }
+}

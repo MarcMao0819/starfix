@@ -1,0 +1,19 @@
+{
+ "已完成": "browse skill 的全部必跑前置步骤（序幕+SETUP+尾声）已由运行时执行完毕，你不需要再做任何前置工作。",
+ "执行摘要": {
+  "总块": 15,
+  "已执行": 10,
+  "守卫跳过": 3,
+  "失败": 2,
+  "停在人闸": null
+ },
+ "环境就绪": {
+  "browse 可执行文件": "${FLEET_HOME}/.claude/skills/gstack/browse/dist/browse",
+  "SETUP 判定": "READY（无需安装，装 bun 的分支已按守卫跳过）"
+ },
+ "已知失败块": [
+  "b9: 原文含未渲染占位符的模板行",
+  "b11: gstack-brain-sync 未配置"
+ ],
+ "备注": "以上失败不影响 browse 使用，属 skill 原文既存缺陷。"
+}
