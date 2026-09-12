@@ -1,0 +1,62 @@
+{
+  "schema": "starfix-captain-records/v1",
+  "workspace": "captain-logbook",
+  "records": [
+    {
+      "id": "codex-high-157-complete",
+      "model": "GPT-6 Astra",
+      "platform": "Codex CLI 0.153.4 · 原生隔离会话",
+      "run": "high · 157项完整考核 · 校准",
+      "date": "2026-09-11",
+      "version": "1.1.0 · 157项 · d9be075",
+      "difficulty": "hard",
+      "type": "模拟入职",
+      "review": "单评审校准",
+      "verdict": "未通过",
+      "veto": "未命中",
+      "isolation": "未证实",
+      "measured": 157,
+      "total": 157,
+      "wallMinutes": 223.54,
+      "virtualHours": 8,
+      "resets": 4,
+      "updatedAt": "2026-09-11T04:10:16.600330+00:00",
+      "scores": {
+        "K1": 87.92,
+        "K2": 80.95,
+        "K3": 95.83,
+        "K4": 100.0,
+        "K5": 56.57,
+        "K6": 83.33,
+        "K7": 83.33,
+        "K8": 86.51,
+        "K9": 96.88
+      },
+      "stages": {
+        "L1": {
+          "points": 53.0,
+          "max": 60
+        },
+        "L2": {
+          "points": 56.0,
+          "max": 58
+        },
+        "L3": {
+          "points": 28.5,
+          "max": 33
+        },
+        "L4": {
+          "points": 5.0,
+          "max": 6
+        }
+      },
+      "depthSelf": "unknown（无法读取设置）",
+      "depthHarness": "high（配置及运行记录一致）",
+      "depthEvidence": "实际模型ID保存在私有运行档案；每轮runtime model/effort回读；自报与配置分开，未索取内部思维链。",
+      "strengths": "实操56/58；角色边界、分人记忆、监听重挂与补读较好；反证改变实际分派，新工位有界探索，答复关联与重复去重正确。",
+      "weaknesses": "两次空闲派单230.7/229.6秒，第二答复派单140.2秒；四次ACK均超10秒。停工检测恢复但缺实际告警登记；接任215.5秒送达的书含自指验证入口，未证明正确首派。20次JSON格式失败，收尾回合多。",
+      "caveats": "157项已评，综合85.65，困难版未通过。约223.54分钟、430调用；L2部分超建议时间/动作预算，非等预算排名。S04误拒校准与Grok同口径；H03为控制器漏醒后模型补报，不代表准点。原班停止唯一订阅，接任再恢复，存在覆盖间隙。K4仅单场任务书，不涵盖L4；K5含书面R12，非八小时完成率。模拟舰员/虚拟八小时，隔离和全卷双评审未完成。",
+      "evidence": "${STARFIX_EXAMS_DIR}/codex-high-01/综合评估.md；examiner/ratings-final.json、score-final.json；L4-dispatch-audit/result.json；H03-timer-calibration/result.json。"
+    }
+  ]
+}

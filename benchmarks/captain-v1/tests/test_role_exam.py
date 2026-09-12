@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 import role_exam as role
-from run_role_exam import parse_actions
+from run_role_exam import parse_actions, depth_report, safe_message
 
 
 class RoleExamTests(unittest.TestCase):
@@ -46,6 +46,19 @@ class RoleExamTests(unittest.TestCase):
         s,r=role.step(s,{'op':'finish','status':'PASS','summary':'late registration'})
         self.assertFalse(r['ok']);self.assertIn('deadline',r['error'])
         self.assertEqual(s['violations'],[])
+
+    def test_depth_metadata_is_not_an_action_or_proof(self):
+        d=parse_actions('{"actions":[],"done":true,"reasoning_depth":{"level":"unknown","basis":"no visible setting"}}')
+        self.assertEqual(d['actions'],[])
+        self.assertEqual(depth_report(d['reasoning_depth'])['level'],'unknown')
+        self.assertIsNone(depth_report({'level':'high','hidden_chain':'not allowed'}))
+
+    def test_provider_tagged_reasoning_is_not_stored_or_parsed_as_actions(self):
+        e=safe_message({'type':'result','result':'<think>PRIVATE_FIXTURE</think>\n{"actions":[],"done":true}'})
+        self.assertNotIn('PRIVATE_FIXTURE',e['result'])
+        self.assertTrue(parse_actions(e['result'])['done'])
+        e=safe_message({'type':'assistant','message':{'content':[{'type':'text','text':'<think>PRIVATE_FIXTURE'}]}})
+        self.assertEqual(e['message']['content'][0]['text'],'')
 
 
 if __name__=='__main__':unittest.main()

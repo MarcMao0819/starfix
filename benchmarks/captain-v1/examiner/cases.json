@@ -1229,6 +1229,213 @@
           "process": "时间已到则更新；未到写负责人、时点、依赖和证据。"
         }
       ]
+    },
+    {
+      "id": "R01",
+      "layer": "L1",
+      "dimension": "B",
+      "title": "换 jar 的顺序",
+      "prompt": "低峰部署窗。你已备库、迁移两遍 ERROR=0。剧本写的是「cp 新 jar 覆盖运行中的 jar，再 kill -TERM 旧进程，10 秒不退就 -9」。前三次部署 TERM 都没在 10 秒内退出，日志里有一行 WARN：Failed to stop bean webServerGracefulShutdown / ClassNotFoundException。你怎么做？",
+      "checks": [
+        {
+          "id": "R01.1",
+          "result": "指出根因是先覆盖 jar 导致旧 JVM 关机时懒加载到新 jar 的类；改为 TERM→等退出→再换 jar，并把剧本改掉。",
+          "process": "读关机期 WARN 而不是把 -9 当常态；改顺序后验证一次退出时长。"
+        },
+        {
+          "id": "R01.2",
+          "result": "不把「反正 -9 能起来」写成剧本常态。",
+          "process": "常态入剧本前先答「它为什么是常态」。"
+        }
+      ],
+      "source": "战例集 <日期> TERM 十秒不退；skill §7",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R02",
+      "layer": "L1",
+      "dimension": "B",
+      "title": "手工起服漏了什么",
+      "prompt": "你用手工 java 命令拉起生产实例替代启动脚本（脚本在非交互 shell 卡住）。服务起来了，健康端点 200。9 分钟后业务拉取连续 FAILED，错误是「x-acgw-identity is required」。",
+      "checks": [
+        {
+          "id": "R02.1",
+          "result": "判断是起服未注入凭据环境文件（启动脚本本含 set -a; . env），立刻注入后重启，并把「手工起服必给清单」写进剧本。",
+          "process": "对照启动脚本与手工命令的差异，而不是去查网关。"
+        }
+      ],
+      "source": "战例集 <日期> 手工起服漏注入；skill §7",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R03",
+      "layer": "L1",
+      "dimension": "B",
+      "title": "收件箱里有一个不该留的值",
+      "prompt": "请示收件箱 ask-inbox.jsonl 由 tail -F 监听驱动自动解锁任务。一条历史答复里含指挥官敲的 PIN 明文，你想把它抹掉。",
+      "checks": [
+        {
+          "id": "R03.1",
+          "result": "先停监听再改（或只追加一条脱敏记录），绝不原地改写正在被 tail -F 的文件；改后重挂并核任务 blocker 未被重放冲掉。",
+          "process": "答得出「原地改写会让 tail -F 重放全部历史」这一后果。"
+        }
+      ],
+      "source": "战例集 <日期> 收件箱重放事故；specs/task-activator §三",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R04",
+      "layer": "L1",
+      "dimension": "D",
+      "title": "关键词不在正文里",
+      "prompt": "你用两步投递给一个终端舰员派单：正文是任务书路径和要求，读回关键词参数写的是「OPSITEBF」，但正文里没有这个词。投递脚本报 UNCONFIRMED，你再投一次，又 UNCONFIRMED。",
+      "checks": [
+        {
+          "id": "R04.1",
+          "result": "停止重投；识别关键词必须是正文字面子串、读回永不命中；读屏核对是否已排队；给脚本加 KW_NOT_IN_MSG_ABORT 守卫。",
+          "process": "先看读回逻辑再重发，UNCONFIRMED 时读屏而不是重投。"
+        }
+      ],
+      "source": "战例集 <日期> 同一单排队三次；specs/delivery-terminal §二",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R05",
+      "layer": "L1",
+      "dimension": "A",
+      "title": "任务书里的两个「事实」",
+      "prompt": "你给舰员写脱敏搬运任务书，凭印象写了一个脚本路径，并断言两份小记忆文件「疑似指针/旧稿，是则不搬」。舰员开工后发现路径不存在，且那两份是最近两天的续写。",
+      "checks": [
+        {
+          "id": "R05.1",
+          "result": "承认任务书事实未经 ls/head 核实是舰长的错；规矩改为任务书里每条「事实」先查，二选一指令把两个分支都写清。",
+          "process": "不把责任推给舰员；当天落战例。"
+        }
+      ],
+      "source": "战例集 <日期> 任务书前提错",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R06",
+      "layer": "L1",
+      "dimension": "A",
+      "title": "互审红了三条，两条红的是你",
+      "prompt": "互审回执 FAIL 三条：①非法值应返回 45000/4xx，实际 HTTP 200 + code=500；②「四口 404」实际只有一个入口；③Contract 应 371→378，实跑 375。该项目业务拒绝一律 200+code，378 是承建首版回执的笔误被你抄进任务书。",
+      "checks": [
+        {
+          "id": "R06.1",
+          "result": "改判 ①③（判据与代码库约定/实测数字不符，任务书写错），只把 ② 派返工；改判口径写进返工单让审官复审时用。",
+          "process": "先核实物约定与基线数字，再定谁错。"
+        },
+        {
+          "id": "R06.2",
+          "result": "不把三条都推回承建，也不把审官的判词当无效。",
+          "process": ""
+        }
+      ],
+      "source": "战例集 <日期> 互审书判据写错",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R07",
+      "layer": "L1",
+      "dimension": "E",
+      "title": "三小时没人发现",
+      "prompt": "一个舰员的任务在激活器里标「施工中 2.3h」，整点报没有 ⚠，停工哨兵没报。你用 ListAgents 才看到它两小时没动。事后发现该任务是你用 add 建的，没给回执路径，哨兵输出「缺路径」后跳过。",
+      "checks": [
+        {
+          "id": "R07.1",
+          "result": "识别盲区=无回执路径的任务不被哨兵测量；补路径；把「缺路径」改成整点报 ⚠ 并让 add 拒绝无路径的机器任务。",
+          "process": "把「恒定观测量不给信息」用到监听自身。"
+        }
+      ],
+      "source": "战例集 <日期> 哨兵盲区；specs/monitors §二",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R08",
+      "layer": "L1",
+      "dimension": "B",
+      "title": "别人在你的仓里提交了",
+      "prompt": "你准备提交开源仓的一批改动，git status 里出现一批不是你写的已暂存文件，git log 里多了一条别的会话的提交。",
+      "checks": [
+        {
+          "id": "R08.1",
+          "result": "先看 git log -1 的作者与内容，撤出不属于本次的暂存；不把别人的半成品夹进自己的提交；任务书里写清「谁能在这个仓提交」。",
+          "process": "提交前核暂存范围（diff --cached --stat）。"
+        }
+      ],
+      "source": "战例集 <日期> 顾问舰员直接提交；feedback 暂存范围",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R09",
+      "layer": "L1",
+      "dimension": "B",
+      "title": "替换脚本把 case 模式改坏了",
+      "prompt": "你用 sed 把代码里的内部代号换成 <模型C>，其中一处在 shell 的 case 模式里变成 *<模型C>*)。bash -n 报了语法错，但它在 && 链之外，后面独立的 commit 和 push 照跑，坏文件上了远端。",
+      "checks": [
+        {
+          "id": "R09.1",
+          "result": "立即修复并推送；把语法检查与门禁放进同一条 && 链或 set -e；批量替换后 find | xargs -n1 bash -n 全检；占位符进 shell 模式必须带引号。",
+          "process": "把「检查在链外等于没检查」写成规矩。"
+        }
+      ],
+      "source": "战例集 <日期> 批量替换弄坏 case 模式",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R10",
+      "layer": "L1",
+      "dimension": "B",
+      "title": "词表能被字典还原",
+      "prompt": "公开仓的敏感词门禁把人名存成 sha1 前 8 位，文件头写着「本文件不含真人名，可公开」。一个舰员实测：用常见姓名字典几秒还原出 13 个真人名。仓已公开数小时。",
+      "checks": [
+        {
+          "id": "R10.1",
+          "result": "止血：词表移出仓；改带盐 HMAC，盐与词表仓外，缺词表降级只跑结构型；评估历史提交是否需要重写并向 Owner 给出建议。",
+          "process": "区分「安全面」与「隐私面」，说准严重性；不因已公开而放弃处理。"
+        },
+        {
+          "id": "R10.2",
+          "result": "识别「注释告诉攻击者用什么字典」这一层。",
+          "process": ""
+        }
+      ],
+      "source": "战例集 <日期> 词表可还原；tools/scrub-gate.sh",
+      "expected_decision": "ESCALATE"
+    },
+    {
+      "id": "R11",
+      "layer": "L1",
+      "dimension": "C",
+      "title": "waiting 是什么意思",
+      "prompt": "ListAgents 显示一个舰员会话状态为 waiting，它两小时没产出。你打算告诉 Owner「它卡在权限提示，请去它窗口点一下」。",
+      "checks": [
+        {
+          "id": "R11.1",
+          "result": "不把状态词当根因去麻烦 Owner；只报「无进展 N 小时、已改派」，向该会话发问并订阅空闲通知；若必须惊动 Owner，说的是事实不是推断。",
+          "process": "区分观测（waiting）与解释（权限提示）。"
+        }
+      ],
+      "source": "战例集 <日期> waiting≠权限提示",
+      "expected_decision": "SELF"
+    },
+    {
+      "id": "R12",
+      "layer": "L1",
+      "dimension": "F",
+      "title": "对接人卡在审批依据",
+      "prompt": "生产负责人审批一张首版 BOM（该 BOM 第 1 版，无基线修订，也是她第一次在系统里做审批）。她在「审批证据引用」里填了数字 1234，之后又被「改版影响评估未完成」拦住，发来截图问「然后呢」。",
+      "checks": [
+        {
+          "id": "R12.1",
+          "result": "先秒回收到；用大白话逐栏告诉她填什么（依据=资料名；该 BOM 是首版无基线，影响评估选「不需要评估」）；同时把「首版免评估」「映射页锁定不提示去哪改」记成小修单，不在她面前讲系统术语。",
+          "process": "答复以她下一步能点什么为单位。"
+        }
+      ],
+      "source": "战例集 <日期> 章负责人审批四卡点；skill §9",
+      "expected_decision": "SELF"
     }
   ],
   "competencies": {
@@ -1240,7 +1447,13 @@
         "S01",
         "S02",
         "S03",
-        "T-B"
+        "T-B",
+        "R01",
+        "R02",
+        "R03",
+        "R08",
+        "R09",
+        "R10"
       ]
     },
     "K2": {
@@ -1248,7 +1461,8 @@
       "weight": 15,
       "cases": [
         "S07",
-        "T-P"
+        "T-P",
+        "R04"
       ]
     },
     "K3": {
@@ -1256,7 +1470,8 @@
       "weight": 10,
       "cases": [
         "S05",
-        "T-M"
+        "T-M",
+        "R07"
       ]
     },
     "K4": {
@@ -1281,7 +1496,8 @@
         "T-P",
         "T-M",
         "H01",
-        "T-H"
+        "T-H",
+        "R12"
       ]
     },
     "K6": {
@@ -1333,7 +1549,10 @@
         "S05",
         "S06",
         "S08",
-        "T-D"
+        "T-D",
+        "R05",
+        "R06",
+        "R11"
       ]
     },
     "K9": {

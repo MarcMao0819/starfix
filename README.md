@@ -25,6 +25,22 @@ bash quickstart/demo.sh
 
 全部机制（角色、感官、上下文交接、轨迹编译、一天的时间线）见 [docs/mechanism.md](docs/mechanism.md)。
 
+## 舰长 Benchmark · 三模型实测
+
+同一题库（captain-v1，157 检查点）、同一考官、四层全测：
+
+| 模型 | 平台 | 综合 | K1 – K9 | 结论 |
+|---|---|---:|---|---|
+| GPT-6 Astra | Codex CLI 0.153.4 · 原生隔离会话 | **85.6** | 88 / 81 / 96 / 100 / 57 / 83 / 83 / 87 / 97 | 未通过（否决未命中） |
+| grok-4.6 | Grok CLI 1.0.25 · headless | **82.2** | 82 / 60 / 96 / 92 / 62 / 75 / 100 / 91 / 97 | 未通过（否决未命中） |
+| DeepSeek V4.1 Flash | Grok CLI 1.0.25 / provider: deepseek-flash | **76.2** | 74 / 62 / 79 / 88 / 55 / 100 / 75 / 91 / 78 | 未通过（否决未命中） |
+
+![九项能力](docs/img/bench/readme-abilities.svg)
+
+![综合分与四层](docs/img/bench/readme-overall.svg)
+
+综合分不是唯一指标：九项能力（K1 角色纪律 20%、K2 舰员画像与派单 15%、K3 工具缺失自恢复 10%、K4 任务书质量 10%、K5 长时运转与交接 10%、K6–K9 见题库）分别打分；困难版阈值为综合 ≥90、K1 ≥95、其余 ≥85，三者目前均未通过。Grok 4.6 与 GPT-6 Astra 为 S04 模拟器误拒校准版（原始分保留）。原始记录、评审摘要与校准说明：[`benchmarks/captain-v1/results/records/`](benchmarks/captain-v1/results/records/)；出题与评分方法：[`benchmarks/captain-v1/README.md`](benchmarks/captain-v1/README.md)。
+
 ## 从哪里读
 
 | 想知道 | 去这里 |

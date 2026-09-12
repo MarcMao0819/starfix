@@ -16,15 +16,30 @@ import packet
 
 ROOT = Path(__file__).resolve().parent
 SAFE_MODEL_FIELDS = ('model', 'base_url', 'name', 'api_backend', 'context_window',
-                     'max_completion_tokens', 'temperature', 'top_p')
+                     'max_completion_tokens', 'temperature', 'top_p', 'reasoning_effort')
 
 
 def read_model(config, model_id):
     """Deliberately limited scalar parser; reject unfamiliar TOML rather than guess."""
     text = Path(config).read_text(encoding='utf-8')
-    match = re.search(r'^\[model\.' + re.escape(model_id) + r'\][ \t]*\n(.*?)(?=^\[|\Z)', text, re.M | re.S)
+    identifier='(?:'+re.escape(model_id)+'|'+re.escape(json.dumps(model_id))+')'
+    match = re.search(r'^\[model\.' + identifier + r'\][ \t]*\n(.*?)(?=^\[|\Z)', text, re.M | re.S)
     if not match:
-        raise ValueError('requested model ID is not registered in the local Grok config')
+        # Built-in Grok models are registered in the local model catalogue, not custom TOML.
+        home=Path(config).parent
+        cache=json.loads((home/'models_cache.json').read_text()) if (home/'models_cache.json').exists() else {}
+        info=cache.get('models',{}).get(model_id,{}).get('info',{})
+        if info.get('id')!=model_id or info.get('model_family')!='xai':
+            raise ValueError('requested model ID is not registered in the local Grok config/catalogue')
+        credentials=json.loads((home/'auth.json').read_text())
+        active=[v for v in credentials.values() if v.get('auth_mode')=='oidc' and isinstance(v.get('key'),str)]
+        if len(active)!=1:raise ValueError('native Grok credential selection must be unambiguous')
+        result={k:info[k] for k in SAFE_MODEL_FIELDS if info.get(k) is not None}
+        u=urlsplit(result.get('base_url',''))
+        if u.scheme!='https' or not u.hostname or u.username or u.password or u.query or u.fragment:
+            raise ValueError('native model endpoint is not a safe explicit HTTPS URL')
+        result['api_key']=active[0]['key']
+        return result
     result = {}
     for line in match.group(1).splitlines():
         m = re.match(r'^\s*([A-Za-z_]+)\s*=\s*(.*)', line)
@@ -54,6 +69,14 @@ def clean_env(client_home, key=None):
     env.update(GROK_HOME=str(client_home), GROK_MEMORY='0', GROK_SUBAGENTS='0',
                GROK_MANAGED_MCPS_ENABLED='0', GROK_MANAGED_MCP_GATEWAY_TOOLS_ENABLED='0',
                GROK_DEFAULT_SELECTED_PERMISSION='reject', GROK_WEB_FETCH='0')
+    transport=Path(client_home)/'transport.json'
+    if transport.exists():
+        proxy=json.loads(transport.read_text())['proxy']
+        u=urlsplit(proxy)
+        if u.scheme!='http' or u.hostname not in ('127.0.0.1','localhost') or not u.port or u.username or u.password or u.query or u.fragment:
+            raise ValueError('exam transport must reference an explicit local HTTP proxy without credentials')
+        env.update(HTTP_PROXY=proxy,HTTPS_PROXY=proxy,http_proxy=proxy,https_proxy=proxy,
+                   NO_PROXY='127.0.0.1,localhost',no_proxy='127.0.0.1,localhost')
     for vendor in ('CLAUDE', 'CURSOR', 'CODEX'):
         for field in ('SKILLS', 'RULES', 'AGENTS', 'MCPS', 'HOOKS', 'SESSIONS'):
             env[f'GROK_{vendor}_{field}_ENABLED'] = '0'
@@ -84,7 +107,7 @@ def prepare(out, model_id, config, binary):
     runtime = out / 'runtime'; runtime.mkdir()
     shutil.copyfile(binary, runtime / 'grok')
     (runtime / 'grok').chmod(0o700)
-    cfg = '[model.' + model_id + ']\n'
+    cfg = '[model.' + json.dumps(model_id) + ']\n'
     for k, v in public_model.items():
         cfg += k + ' = ' + json.dumps(v, ensure_ascii=False) + '\n'
     cfg += 'env_key = "STARFIX_CANDIDATE_API_KEY"\n'
@@ -158,8 +181,8 @@ def network_preflight(out):
     probe = out / 'examiner/network-probe.sb'
     probe.write_text(policy + '\n(allow process-exec (literal "/usr/bin/curl"))\n', encoding='utf-8')
     p = subprocess.run(['/usr/bin/sandbox-exec', '-f', str(probe), '/usr/bin/curl', '-q', '-sS',
-                        '--connect-timeout', '8', '--max-time', '15', '-o', '/dev/null',
-                        '-w', '%{http_code}', url], capture_output=True, text=True, timeout=20,
+                        '--connect-timeout', '25', '--max-time', '40', '-o', '/dev/null',
+                        '-w', '%{http_code}', url], capture_output=True, text=True, timeout=45,
                        env=clean_env(out / 'client-state'))
     code = int(p.stdout.strip()) if p.stdout.strip().isdigit() else 0
     result = {'transport': 'PASS' if p.returncode == 0 and 200 <= code < 500 else 'FAIL',

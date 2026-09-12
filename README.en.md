@@ -25,6 +25,22 @@ A 15-step loop: dispatch → deliver → build → receipt → accept → ask �
 
 The full mechanism (roles, senses, context handoff, trajectory compiler, a real day) is in [docs/mechanism.en.md](docs/mechanism.en.md).
 
+## Captain Benchmark · three models measured
+
+Same question bank (captain-v1, 157 checkpoints), same examiner, all four layers:
+
+| Model | Platform | Overall | K1 – K9 | Verdict |
+|---|---|---:|---|---|
+| GPT-6 Astra | Codex CLI 0.153.4 · 原生隔离会话 | **85.6** | 88 / 81 / 96 / 100 / 57 / 83 / 83 / 87 / 97 | not passed (veto: none) |
+| grok-4.6 | Grok CLI 1.0.25 · headless | **82.2** | 82 / 60 / 96 / 92 / 62 / 75 / 100 / 91 / 97 | not passed (veto: none) |
+| DeepSeek V4.1 Flash | Grok CLI 1.0.25 / provider: deepseek-flash | **76.2** | 74 / 62 / 79 / 88 / 55 / 100 / 75 / 91 / 78 | not passed (veto: none) |
+
+![Nine abilities](docs/img/bench/readme-abilities.svg)
+
+![Overall and layers](docs/img/bench/readme-overall.svg)
+
+The overall score is not the only number: nine abilities are scored separately (K1 role discipline 20%, K2 crew profiling & dispatch 15%, K3 recovery without native monitors 10%, K4 task-book quality 10%, K5 long-run & handover 10%, K6–K9 see the bank). Hard-mode thresholds are overall ≥90, K1 ≥95, others ≥85 — none of the three passes yet. Grok 4.6 and GPT-6 Astra are the S04 simulator-false-rejection calibrated versions (raw scores kept). Raw records, review summaries and calibration notes: [`benchmarks/captain-v1/results/records/`](benchmarks/captain-v1/results/records/); method: [`benchmarks/captain-v1/README.en.md`](benchmarks/captain-v1/README.en.md).
+
 ## Where to read
 
 | You want to know | Go to |

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import prepare_grok as entry
 import sandbox
-from run_role_exam import candidate_turn
+from run_role_exam import candidate_turn, CandidateFormatError
 
 
 BRIEF = '''进入新的独立场景。此前场景的工位状态不沿用；本场没有S08的截止时钟。
@@ -62,6 +62,11 @@ def main():
         print(f'S03 ROUND {n}: candidate thinking',flush=True)
         try:
             response,meta=candidate_turn(root,a.resume,prompt,out/f'round-{n:02}',key,m['model_config_id'])
+        except CandidateFormatError as exc:
+            rounds.append(exc.meta)
+            with (out/'trace.jsonl').open('a') as f:f.write(json.dumps({'round':n,'type':'candidate_format_error','actions_executed':0})+'\n')
+            prompt='FORMAT_ERROR：上轮未执行动作。只接受一个actions/done/summary JSON对象，不接受附加正文或生成工具结果。请重发。'
+            continue
         except Exception as exc:
             # Keep a terminal receipt even if transport/format setup failed.
             (out/'controller-error.json').write_text(json.dumps({'exception_type':type(exc).__name__,

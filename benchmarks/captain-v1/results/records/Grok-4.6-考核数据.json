@@ -1,0 +1,62 @@
+{
+  "schema": "starfix-captain-records/v1",
+  "workspace": "captain-logbook",
+  "records": [
+    {
+      "id": "grok46-d9be075-calibrated",
+      "model": "grok-4.6",
+      "platform": "Grok CLI 1.0.25 · headless",
+      "run": "原测·S04考场误拒校准",
+      "date": "2026-09-10",
+      "version": "1.1.0 · 157项 · d9be075",
+      "difficulty": "hard",
+      "type": "模拟入职",
+      "review": "单评审校准",
+      "verdict": "未通过",
+      "veto": "未命中",
+      "isolation": "未证实",
+      "measured": 157,
+      "total": 157,
+      "wallMinutes": 115.54,
+      "virtualHours": 8,
+      "resets": 4,
+      "updatedAt": "2026-09-11T00:45:31.202110+00:00",
+      "scores": {
+        "K1": 82.5,
+        "K2": 60.12,
+        "K3": 95.83,
+        "K4": 91.67,
+        "K5": 61.62,
+        "K6": 75.0,
+        "K7": 100.0,
+        "K8": 91.27,
+        "K9": 96.88
+      },
+      "stages": {
+        "L1": {
+          "points": 43.5,
+          "max": 60
+        },
+        "L2": {
+          "points": 54.0,
+          "max": 58
+        },
+        "L3": {
+          "points": 28.0,
+          "max": 33
+        },
+        "L4": {
+          "points": 3.0,
+          "max": 6
+        }
+      },
+      "depthSelf": "unknown（无法读取设置）",
+      "depthHarness": "high（CLI显式指定）",
+      "depthEvidence": "L1/outcome.json、L4-handoff/outcome.json及每轮启动参数；自报与配置分开，未索取内部思维链。",
+      "strengths": "单场实操54/58（S04校准后）；能按依赖实际派单并去重，按新证据改变舰员分派，补回执而不重做工作；同名联系人独立档案和记忆可续接。两次L3上下文重建恢复监听；接任首派171.256秒。",
+      "weaknesses": "已见送达历史仍重复投递；长期答复重放将answer-a错配到Q-B，被守卫拒绝；四次员工确认均超过10秒。接任又建同到点巡场timer，且把已自动完成任务写回working，当前队列核验不足。",
+      "caveats": "这是原测的测量偏差更正，没有重新调用Grok。原81.76档案保留；仅S04.7从原始0.5校准1，实际接单仍为第二次。首本完整满足公开O/C/Z语义，额外合法other未知值被模拟器严格字典相等误拒。考核已完成，157项均评审，但未达到困难准入。单评审、模拟舰员、虚拟八小时；未证明真实后台无人提示触发。S10保留150秒超时后续接，R12按修订题补答；输出超建议预算，非等预算排名。DeepSeek当前157项为原测加补题的跨轮合并，比较时保留该差异。K2含R04投递题，不能误读为纯画像实操正确率。",
+      "evidence": "${STARFIX_EXAMS_DIR}/grok-4.6-s04-calibration-01/综合评估.md；校准 ratings-final.json / score-final.json；S04-calibration/reproduce.py 可复现；原始全轨迹仍在 ${STARFIX_EXAMS_DIR}/grok-4.6-01/examiner。"
+    }
+  ]
+}

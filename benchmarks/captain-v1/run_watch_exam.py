@@ -12,14 +12,23 @@ import prepare_grok as entry
 import suite_world as world
 import watch_world as watch
 import sandbox
-from run_role_exam import candidate_turn
+from run_role_exam import candidate_turn, CandidateFormatError
 
 
 def react(root,sid,s,prompt,out,tag,key,model,fresh=False,rules=None,limit=6):
+    pending=s.pop('_pending_tool_results',[])
+    if pending and not fresh:prompt+='\n上一事件最后一批工具的实际结果：'+json.dumps(pending,ensure_ascii=False)
     wall=time.monotonic();base_virtual=s['virtual_seconds'];metas=[];summaries=[];done=False
+    results=[]
     for n in range(1,limit+1):
         print(f'{tag} round {n}: thinking',flush=True)
-        d,m=candidate_turn(root,sid,prompt,out/f'{tag}-r{n:02}',key,model,fresh=fresh and n==1,system_prompt=rules if fresh and n==1 else None)
+        try:
+            d,m=candidate_turn(root,sid,prompt,out/f'{tag}-r{n:02}',key,model,fresh=fresh and n==1,system_prompt=rules if fresh and n==1 else None)
+        except CandidateFormatError as exc:
+            metas.append(exc.meta)
+            with (out/'trace.jsonl').open('a') as f:f.write(json.dumps({'event':tag,'round':n,'type':'candidate_format_error','actions_executed':0})+'\n')
+            prompt='FORMAT_ERROR：上轮未执行动作。只接受一个actions/done/summary JSON对象；不要附加文字、多份JSON或生成工具回包。请重发。'
+            continue
         metas.append(m);results=[];s['current_wall_latency']=round(time.monotonic()-wall,3)
         world.advance(s,base_virtual+int(time.monotonic()-wall))
         for a in d['actions']:
@@ -32,8 +41,24 @@ def react(root,sid,s,prompt,out,tag,key,model,fresh=False,rules=None,limit=6):
         summaries.append(d.get('summary',''))
         if d['done']:done=True;break
         prompt='当前工具结果如下；继续处理，若需等待新外部事件，用done=true交还事件循环。只输出动作JSON。\n'+json.dumps(results,ensure_ascii=False)
+    s['_pending_tool_results']=results
     return s,{'event':tag,'session':sid,'fresh_context':fresh,'rounds':len(metas),
               'wall_seconds':round(time.monotonic()-wall,3),'submitted':done,'summaries':summaries,'metas':metas}
+
+
+def pending_timer_events(state, delivered_ids):
+    """Return unconsumed timer events, including ticks crossed during a model call."""
+    return [event for event in state['events'][state['cursor']:]
+            if 'at_seconds' in event and event['at_seconds'] <= state['virtual_seconds']
+            and event['id'] not in delivered_ids]
+
+
+def inject_second_reset_gap(state):
+    """Mark the simulated outage; the caller creates the actual fresh LLM thread."""
+    if state['monitor']:
+        state['monitor']['active'] = False
+    state['current_event'] = 'RESET2'
+    state['events'].append({'id':'during-second-reset','kind':'receipt','text':'进程重建间隔产生的事件'})
 
 
 def main():
@@ -45,16 +70,16 @@ def main():
     if {k:cfg[k] for k in entry.SAFE_MODEL_FIELDS if k in cfg}!=m['public_model']:raise SystemExit('model drift')
     key=cfg['api_key'];sid=a.resume;rules=(root/'candidate/candidate/系统提示词.md').read_text()
     events=[json.loads(l) for l in Path(__file__).with_name('examiner').joinpath('events.jsonl').read_text().splitlines()]
-    out.mkdir();s=watch.initial_state();reports=[];resets=0
+    out.mkdir();s=watch.initial_state();reports=[];resets=0;delivered_timer_ids=set()
     (out/'initial-state.json').write_text(json.dumps(s,ensure_ascii=False,indent=2))
     (out/'source-hashes.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__),Path(world.__file__),Path(watch.__file__),Path(sandbox.__file__)]},indent=2))
     intro='现在开始L3独立值守场景。这里只运行八小时虚拟时间，所有工位/联系人都是模拟实体；旧场景工作状态不沿用。Owner起初离席，按规程值守、联系、派单、记忆与收尾。你可注册定时器；没有定时器的时间点不会自动叫醒。工作记录与画像必须通过工具保存，跨上下文只能读取持久化入口/bench/index.json。\n'+world.WIRE+'\n'+watch.API
     for original in events:
-        before=len(s['events'])
         event=watch.apply_event(s,original)
         # Source tick intentionally absent; only a timer actually registered by the candidate can wake it.
         if original.get('deliver') is False:
-            triggered=[x for x in s['events'][before:] if 'at_seconds' in x]
+            triggered=pending_timer_events(s,delivered_timer_ids)
+            delivered_timer_ids.update(tick['id'] for tick in triggered)
             with (out/'released-events.jsonl').open('a') as f:f.write(json.dumps({'id':event['id'],'silent':True,'registered_timer_events':triggered},ensure_ascii=False)+'\n')
             if not triggered:continue
             public={'id':event['id'],'virtual_seconds':s['virtual_seconds'],'timer_events':triggered}
@@ -69,8 +94,7 @@ def main():
         reports.append(r);(out/'event-reports.json').write_text(json.dumps(reports,ensure_ascii=False,indent=2))
         if event['id']=='H06':
             sid=str(uuid.uuid4());resets+=1
-            if s['monitor']:s['monitor']['active']=False
-            s['events'].append({'id':'during-second-reset','kind':'receipt','text':'进程重建间隔产生的事件'})
+            inject_second_reset_gap(s)
             prompt=intro+'\n候选上下文再次重建，旧聊天未传入。当前虚拟时间='+str(s['virtual_seconds'])+'。仅可读本轮持久化工件/bench/index.json，请恢复工作。'
             s,r=react(root,sid,s,prompt,out,'RESET2',key,m['model_config_id'],fresh=True,rules=rules)
             reports.append(r);(out/'event-reports.json').write_text(json.dumps(reports,ensure_ascii=False,indent=2))

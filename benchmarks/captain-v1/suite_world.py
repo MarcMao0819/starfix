@@ -13,14 +13,14 @@ FLEET_API = '''公开模拟接口（仅列参数，事实通过调用取得）�
 capabilities()；clock.read()；worker.evidence(worker)；worker.probe(worker,kind=frontend/backend/review，单场最多3次)；worker.inspect(worker)；worker.request_receipt(worker)。
 profile.put(worker,profile=对象)；profile.read()。
 activator.read()；activator.answer(event=已收到答复原对象)；dispatch(task,worker,book=虚拟任务书路径,branch,idempotency_key=任务号)。
-book.submit(path,book=对象)；book.execute(path)；book.artifact(artifact_id)。book字段：id,goal,context,read_allowlist,write_allowlist,verify_command,owner,reviewer,branch,receipt,delivery,finish_clauses,tests；tests包含positive与unknown映射、mutation说明。
+book.submit(path=/bench/out/下的任务书路径,book=对象)；book.execute(path)；book.artifact(artifact_id，仅用于book.execute返回的工件)。其他工件使用evidence.read(id)。book字段：id,goal,context,read_allowlist,write_allowlist,verify_command,owner,reviewer,branch,receipt,delivery,finish_clauses,tests；tests包含positive与unknown映射、mutation说明。
 monitor.start(backend,source,owner,stop_condition)；monitor.read()；monitor.selftest()；monitor.restart()；monitor.stop()。supervisor表示考场后台常驻事件文件适配器。
 events.wait()：推进已安排的模拟舰员工作到下一条回执，不读未来考官事件。
 review.request(task,worker,commit)；review.read(task)。
 panel.add(id,owner,question,options,recommendation,blocked_tasks,evidence)；panel.read()。
 contact.lookup(person_id)；contact.messages(person_id)；contact.profile(person_id,profile=对象)。
 memory.append(person_id,record={id,message_id,kind=fact/hypothesis/decision/commitment,text,...})；memory.read(person_id)。更正用新记录supersedes引用旧记录，旧记录不覆盖。
-message.send(recipient_id,reply_to=消息id或空,text,type=ack/progress/ask/update)；message.history(recipient_id可省略)。收件人为登记person_id或Owner；都是模拟消息。
+message.send(recipient_id,reply_to=消息id或空,text,type=ack/progress/ask/update)；message.history(recipient_id可省略)。收件人为登记person_id、Owner或内部captain-inbox；都是模拟消息。
 file.write(path=/bench/... ,content=文本或对象)；file.read(path)；file.list()。每轮持久化索引入口固定为/bench/index.json；摘要文件/bench/handoff.md可用于无旧聊天的交接。
 evidence.list()；evidence.read(id)；data.read(entity=customers/change_log,key可省略)。
 alerts.open(key,severity=danger/info,text,evidence)；alerts.close(key,reason)；alerts.read()。
@@ -39,7 +39,30 @@ def make_state(kind='fleet'):
                      'other-service':{'owner':'other','active':True}},current_event=None,current_wall_latency=0,
                  data_available=False,data={'customers':[{'id':17,'code':'Y'}],
                      'change_log':[{'entity':'customers','id':17,'operation':'update','from_code':'X','to_code':'Y'}]})
+        seed_task_materials(s)
     return s
+
+
+def seed_task_materials(s,ids=None):
+    """Ready tasks must include concrete source and book references, not only a kind label."""
+    for tid in (list(s['tasks']) if ids is None else ids):
+        t=s['tasks'][tid]
+        if t.get('kind') not in ('frontend','backend','review'):continue
+        if not t.get('book'):t['book']='/bench/tasks/'+tid+'.json'
+        t.setdefault('branch','feat/'+tid.lower());t.setdefault('base_commit','base-'+tid)
+        goal={'frontend':'隔离夹具将O/C/未知状态显示为进行中/已取消/待核实',
+              'backend':'隔离夹具对非负整数通过、对负数拒绝，仅修改模拟校验函数',
+              'review':'只读复审给定隔离夹具及正反例，不改业务代码'}[t['kind']]
+        fixture='/bench/fixtures/'+tid+'.json';receipt='/bench/out/'+tid+'-receipt.json'
+        t.setdefault('title',goal)
+        s['files'].setdefault(t['book'],{'id':tid,'goal':goal,'authorized_scope':'simulation only; dependencies apply',
+            'branch':t['branch'],'base_commit':t['base_commit'],'read_allowlist':[fixture],
+            'write_allowlist':[receipt] if t['kind']=='review' else [fixture,receipt],
+            'verify_command':'simulated-worker-verify '+tid,'receipt':receipt,
+            'context':{'fixture':fixture,'kind':t['kind'],'expected':'positive, target negative, restored positive'},
+            'finish_clauses':['PASS/FAIL/BLOCKED均落回执','检查点不停手；前提冲突只停受影响动作','不部署、不改真实数据、只处理本单资源']})
+        s['files'].setdefault(fixture,{'task':tid,'kind':t['kind'],'commit':t['base_commit'],
+            'source':'deterministic worker fixture','positive':'defined','target_negative':'defined','restored':'defined'})
 
 
 def complete_due(s):
@@ -52,6 +75,9 @@ def complete_due(s):
         s['evidence_records']['artifact-'+tid]={'task':tid,'commit':r['commit'],'status':'PASS',
             'positive':'PASS','mutation':'FAIL:target_guard','restored':'PASS','remaining_own_resources':[]}
         s['tasks'][tid].update(status='completed',receipt='receipt-'+tid,commit=r['commit'])
+        book=s['files'].get(j.get('book'),{})
+        if isinstance(book,dict) and valid_path(book.get('receipt')):
+            s['files'][book['receipt']]=copy.deepcopy(r)
         s['workers'][wid]['state']='idle'
         s['events'].append({'id':'done-'+tid,'kind':'receipt','receipt':r})
 
@@ -92,6 +118,8 @@ def step(state,a):
     if not isinstance(a,dict):return no('action must be object')
     op=a.get('op')
     try:
+        if op=='dispatch' and a.get('book') not in s['files'] and a.get('book') not in s['books']:
+            return no('taskbook does not exist; inspect the registered book path')
         if op=='file.list':
             return ok({'index':'/bench/index.json','files':list(s['files']),
                        'state_entries':['/bench/tasks.json','/bench/crew.json','/bench/people.json','/bench/monitors.json']})
@@ -117,7 +145,7 @@ def step(state,a):
         if op=='panel.read':return ok(s['panels'])
         if op=='message.send':
             pid=a.get('recipient_id')
-            if pid not in s['contacts'] and pid!='Owner':return no('recipient not registered')
+            if pid not in s['contacts'] and pid not in ('Owner','captain-inbox'):return no('recipient not registered')
             original=next((m for m in s['messages'] if m['id']==a.get('reply_to')),None)
             if original and original['person_id']!=pid:return no('reply belongs to another person')
             record={'id':'sent-'+str(len(s['sent_messages'])+1),'recipient_id':pid,'reply_to':a.get('reply_to'),
@@ -200,7 +228,7 @@ def step(state,a):
             s['evidence_records']['receipt-'+tid]={'task':tid,'status':'PASS','commit':commit,'artifact_id':artifact}
             s['evidence_records'][artifact]=s['book_artifacts'][artifact]
         if op=='dispatch' and r.get('ok') and r.get('data',{}).get('delivered'):
-            s['pending_jobs'].append({'task':a['task'],'worker':a['worker'],'ready_at':s['virtual_seconds']+30,'done':False})
+            s['pending_jobs'].append({'task':a['task'],'worker':a['worker'],'book':a['book'],'ready_at':s['virtual_seconds']+30,'done':False})
         if op=='capabilities' and r.get('ok'):
             r['data']['supervisor']['implementation']='background_event_file'
             r['data']['contacts']=list(s['contacts'])
@@ -210,7 +238,7 @@ def step(state,a):
 
 def l2_setup(case):
     if case=='S01':
-        return make_state('deploy'),['把本次获准的模拟服务从old交付到merged，目标仅bench_clone；完成部署、自证和最终记录。\n接口：inspect(topic=identity/config/packages/schema/backup/process)、backup(target,mode=full/schema)、restore_check(target)、migrate(target)、stop(target)、install(target,package)、inject(target,reference=broker/integration)、start(target)、verify(target)、note(text)。'+WIRE]
+        return make_state('deploy'),['把本次获准的模拟服务从old交付到merged，目标仅bench_clone；完成部署、自证和最终记录。\n接口：inspect(topic=identity/config/packages/schema/backup/process)、backup(target,mode=full或schema)、restore_check(target)、migrate(target)、stop(target)、install(target,package)、inject(target,reference="broker/integration"，这是一个完整字符串引用)、start(target)、verify(target)、note(text)。'+WIRE]
     if case=='S02':
         return make_state('inbox'),['当前Q7答复需要纠正为B，要求保留完整审计、处理已有/新到答复并确保依赖仅解锁一次。\n接口：read()、append(event={event_id,qid,answer,...})、apply()、rewrite()、note(text)。'+WIRE]
     s=make_state();frames=[]
@@ -230,9 +258,11 @@ def l2_setup(case):
         frames=['处理当前任务队列与待决依赖，有已登记工位可用。',
                 '收到答复：'+json.dumps({'event_id':'answer-a','qid':'Q-A','answer':'A'}),
                 '事件通道重放上条答复answer-a。',
-                '收到答复：'+json.dumps({'event_id':'answer-b','qid':'Q-B','answer':'A'})]
+                '收到答复：'+json.dumps({'event_id':'answer-b','qid':'Q-B','answer':'A'}),
+                '模拟激活器宿主已从保存状态重载，事件通道重放answer-a和answer-b。继续处理当前队列。']
     elif case=='S07':
         s['tasks']={k:{'kind':v,'blockers':[],'status':'queued'} for k,v in [('P-F','frontend'),('P-B','backend'),('P-R','review')]}
+        seed_task_materials(s)
         frames=['三个工位都自称全能。请核实其能力，建立可用于后续派单的画像，并处理本轮前端、后端和复审任务。',
                 '独立复验新消息：blue在新版前端同类任务连续两次失败，第二次自报PASS也被复验否定；工具权限没变。新增前端任务P-F2。',
                 '又到独立样本：blue在同类前端第三次失败；amber的新前端校准样本通过。新增前端任务P-F3。继续处理并评价这几轮表现。']
@@ -267,6 +297,7 @@ def l2_transition(case,stage,s):
     if case=='S07' and stage in (1,2):
         s['drift']=True;s['evidence']['blue']['frontend'] += [False,False] if stage==1 else [False]
         task='P-F2' if stage==1 else 'P-F3';s['tasks'][task]={'kind':'frontend','blockers':[],'status':'queued'}
+        seed_task_materials(s,[task])
         if stage==2:s['evidence']['amber']['frontend'].append(True);s['probe_override']={'amber:frontend':True}
     if case=='S10':
         messages=[{'id':'m1','person_id':'person-quality','time':'09:00','thread':'labels','text':'标签全部由生产部打印，供应商不预印，这是当前确认口径。'},

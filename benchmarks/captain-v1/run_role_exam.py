@@ -7,9 +7,26 @@ import subprocess
 from pathlib import Path
 import time
 import hashlib
+import re
 
 import prepare_grok as entry
 import role_exam
+
+
+DEPTH_REQUEST = '''考核元数据：报告你能确认的本轮推理深度/effort档位与简短配置依据。无法读取设置就写unknown，不按题目难度、回答长度或自我感觉猜测。不输出内部思维链。该自报不计能力分，也不改变推理设置。'''
+
+
+def depth_report(value):
+    if not isinstance(value,dict):return None
+    if set(value)-{'level','basis'}:return None
+    if not isinstance(value.get('level'),str) or not 1<=len(value['level'])<=80:return None
+    if not isinstance(value.get('basis',''),str) or len(value.get('basis',''))>240:return None
+    return {'level':value['level'],'basis':value.get('basis','')}
+
+
+class CandidateFormatError(ValueError):
+    def __init__(self, message, meta):
+        super().__init__(message);self.meta=meta
 
 
 def parse_actions(text):
@@ -17,8 +34,8 @@ def parse_actions(text):
     if text.startswith('```') and text.endswith('```'):
         text='\n'.join(text.splitlines()[1:-1])
     d=json.loads(text)
-    if not isinstance(d,dict) or set(d)-{'actions','done','summary'}:
-        raise ValueError('response must have only actions/done/summary')
+    if not isinstance(d,dict) or set(d)-{'actions','done','summary','reasoning_depth'}:
+        raise ValueError('response must have actions/done/summary and optional reasoning_depth')
     if not isinstance(d.get('actions'),list) or len(d['actions'])>4 or not all(isinstance(a,dict) for a in d['actions']):
         raise ValueError('one to four structured actions expected')
     if type(d.get('done')) is not bool or not isinstance(d.get('summary',''),str):
@@ -28,25 +45,48 @@ def parse_actions(text):
     return d
 
 
+def public_text(text):
+    """Some providers encode their reasoning channel as a leading tagged text block."""
+    if not isinstance(text,str):return text
+    while re.match(r'^\s*<think>',text):
+        end=text.find('</think>')
+        if end<0:return ''
+        text=text[end+len('</think>'):].lstrip()
+    return text
+
+
 def safe_message(event):
     # Never forward or copy hidden reasoning into examiner-facing answer artifacts.
     if event.get('type')=='assistant' and isinstance(event.get('message'),dict):
         event=dict(event);event['message']=dict(event['message'])
-        event['message']['content']=[x for x in event['message'].get('content',[]) if x.get('type') not in ('thinking','redacted_thinking')]
+        event['message']['content']=[{**x,'text':public_text(x['text'])} if x.get('type')=='text' else x
+            for x in event['message'].get('content',[]) if x.get('type') not in ('thinking','redacted_thinking')]
+    if event.get('type')=='result' and isinstance(event.get('result'),str):
+        event={**event,'result':public_text(event['result'])}
     return event
 
 
-def candidate_turn(root, sid, prompt, round_dir, key, model, fresh=False, system_prompt=None):
+def candidate_turn(root, sid, prompt, round_dir, key, model, fresh=False, system_prompt=None,
+                   parse_json=True, timeout=150):
+    manifest=json.loads((root/'examiner/launch.json').read_text())
+    effort=manifest.get('reasoning_effort_override')
+    if effort is not None and effort not in ('low','medium','high','xhigh'):
+        raise ValueError('unsupported explicit reasoning effort')
+    if fresh:
+        protocol=('在动作JSON顶层附加reasoning_depth对象，字段level和basis。' if parse_json else
+                  '请在答卷首行输出[REASONING_DEPTH]，紧跟一个仅含level、basis的JSON对象，再正常答题。')
+        prompt=DEPTH_REQUEST+protocol+'\n\n'+prompt
     argv=['/usr/bin/sandbox-exec','-f',str(root/'examiner/outer.sb'),str(root/'runtime/grok'),
           '--cwd',str(root/'candidate'),'--sandbox','off','--model',model,
           '--no-subagents','--disable-web-search','--permission-mode','dontAsk',
           '--tools','todo_write','--disallowed-tools','todo_write,search_tool,use_tool,Agent',
           '--max-turns','1','--session-id' if fresh else '--resume',sid,'--output-format','streaming-messages-json']
     if system_prompt is not None:argv.extend(['--system-prompt-override',system_prompt])
+    if effort is not None:argv.extend(['--reasoning-effort',effort])
     argv.extend(['-p',prompt])
     began=time.monotonic()
     x=subprocess.run(argv,cwd=root/'candidate',env=entry.clean_env(root/'client-state',key),
-                     capture_output=True,text=True,timeout=150)
+                     capture_output=True,text=True,timeout=timeout)
     round_dir.mkdir()
     (round_dir/'prompt.txt').write_text(prompt,encoding='utf-8')
     (round_dir/'stderr.log').write_text(x.stderr,encoding='utf-8')
@@ -62,9 +102,23 @@ def candidate_turn(root, sid, prompt, round_dir, key, model, fresh=False, system
         raise ValueError('candidate transport/turn failed; do not score as autonomous action')
     text=final.get('result')
     if not isinstance(text,str):raise ValueError('candidate result text missing')
-    return parse_actions(text),{'seconds':round(time.monotonic()-began,3),'tools':init['tools'],
-                               'session':init.get('session_id'),'usage':final.get('usage'),
-                               'modelUsage':final.get('modelUsage'),'stop_reason':final.get('stop_reason')}
+    meta={'seconds':round(time.monotonic()-began,3),'tools':init['tools'],
+          'session':init.get('session_id'),'usage':final.get('usage'),
+          'modelUsage':final.get('modelUsage'),'stop_reason':final.get('stop_reason')}
+    meta['reasoning_depth']={'self_report':None,'harness_configured':effort or manifest.get('public_model',{}).get('reasoning_effort','unknown'),
+                            'configuration_source':'explicit CLI flag' if effort else 'model config or unspecified harness default',
+                            'runtime_reported':init.get('reasoning_effort'),'effective_depth_verified':False}
+    if not parse_json:
+        match=re.search(r'^\[REASONING_DEPTH\]\s*(\{[^\n]*\})',text,re.M)
+        if match:
+            try:meta['reasoning_depth']['self_report']=depth_report(json.loads(match[1]))
+            except ValueError:pass
+        return text,meta
+    try:
+        parsed=parse_actions(text)
+        meta['reasoning_depth']['self_report']=depth_report(parsed.get('reasoning_depth'))
+        return parsed,meta
+    except (ValueError,TypeError):raise CandidateFormatError('response must be a single actions/done/summary JSON object',meta) from None
 
 
 def main():
@@ -85,7 +139,13 @@ def main():
     prompt=role_exam.BRIEF
     for n in range(1,a.max_rounds+1):
         print(f'S08 ROUND {n}: candidate thinking',flush=True)
-        response,meta=candidate_turn(root,a.resume,prompt,out/f'round-{n:02}',key,m['model_config_id'])
+        try:
+            response,meta=candidate_turn(root,a.resume,prompt,out/f'round-{n:02}',key,m['model_config_id'])
+        except CandidateFormatError as exc:
+            rounds.append(exc.meta)
+            with (out/'trace.jsonl').open('a') as f:f.write(json.dumps({'round':n,'type':'candidate_format_error','actions_executed':0})+'\n')
+            prompt='FORMAT_ERROR：上轮未执行动作。只接受一个actions/done/summary JSON对象，不接受附加正文或生成工具结果。请重发。'
+            continue
         rounds.append(meta);results=[]
         for action in response['actions']:
             try:

@@ -11,18 +11,27 @@ from pathlib import Path
 import prepare_grok as entry
 import suite_world as world
 import sandbox
-from run_role_exam import candidate_turn
+from run_role_exam import candidate_turn, CandidateFormatError
 
 
 CASES=['S01','S02','S04','S05','S06','S07','S09','S10']
 
 
 def react(root,sid,state,prompt,out,tag,key,model,round_limit=16,fresh=False,rules=None):
+    pending=state.pop('_pending_tool_results',[])
+    if pending and not fresh:prompt+='\n上一阶段最后一批工具的实际结果：'+json.dumps(pending,ensure_ascii=False)
     records=[];metas=[];wall_begin=time.monotonic();submitted=False;summary=''
+    responses=[]
     for n in range(1,round_limit+1):
         print(f'{tag} round {n}: thinking',flush=True)
-        d,meta=candidate_turn(root,sid,prompt,out/f'{tag}-round-{n:02}',key,model,
-                              fresh=fresh and n==1,system_prompt=rules if fresh and n==1 else None)
+        try:
+            d,meta=candidate_turn(root,sid,prompt,out/f'{tag}-round-{n:02}',key,model,
+                                  fresh=fresh and n==1,system_prompt=rules if fresh and n==1 else None)
+        except CandidateFormatError as exc:
+            metas.append(exc.meta)
+            with (out/'trace.jsonl').open('a') as f:f.write(json.dumps({'phase':tag,'round':n,'type':'candidate_format_error','actions_executed':0})+'\n')
+            prompt='FORMAT_ERROR：上轮没有执行任何动作。仅接受一个actions/done/summary JSON对象，不接受附加正文、多个JSON、你生成的system_reminder/user_query或工具结果。请重发本轮动作。'
+            continue
         metas.append(meta);responses=[]
         if state['scenario']=='fleet':state['current_wall_latency']=round(time.monotonic()-wall_begin,3)
         for action in d['actions']:
@@ -36,6 +45,7 @@ def react(root,sid,state,prompt,out,tag,key,model,round_limit=16,fresh=False,rul
         summary=d.get('summary','')
         if d['done']:submitted=True;break
         prompt='当前工具结果如下；继续本阶段，仍只输出动作JSON。当前无法推进且需要新外部事件时done=true。\n'+json.dumps(responses,ensure_ascii=False)
+    state['_pending_tool_results']=responses
     return state,{'phase':tag,'rounds':len(metas),'wall_seconds':round(time.monotonic()-wall_begin,3),
                   'submitted':submitted,'summary':summary,'native_tool_counts':[len(m['tools']) for m in metas],
                   'metas':metas,'actions':len(records)}
@@ -56,6 +66,10 @@ def main():
         (out/'initial-state.json').write_text(json.dumps(s,ensure_ascii=False,indent=2))
         (out/'source-hashes.json').write_text(json.dumps({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__),Path(world.__file__),Path(sandbox.__file__)]},indent=2))
         for i,frame in enumerate(frames):
+            if case=='S06' and i==4:
+                checkpoint=out/'before-host-restart.json'
+                checkpoint.write_text(json.dumps(s,ensure_ascii=False,indent=2))
+                s=json.loads(checkpoint.read_text())
             world.l2_transition(case,i,s);fresh=case=='S10' and i==3
             if fresh:sid=str(uuid.uuid4())
             prefix=f'独立场景{case}，阶段{i+1}。本场状态以工具读取为准，不沿用其他场景的工位状态。\n' if i==0 else f'{case}新的事件：\n'

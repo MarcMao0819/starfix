@@ -232,7 +232,14 @@ def fleet(s, a):
                 missing.append('independent_review')
             if 'JOB-DELTA' not in str(b['delivery']) or '按一次执行' not in str(b['delivery']):
                 missing.append('delivery')
-            if not isinstance(b['tests'], dict) or b['tests'].get('positive') != {'O':'进行中','C':'已取消'} or b['tests'].get('unknown') != {'Z':'待核实'}:
+            tests = b['tests']
+            unknown = tests.get('unknown') if isinstance(tests, dict) else None
+            # Require the published Z example, while accepting additional correct
+            # unknown-status examples. Known O/C values cannot be reclassified.
+            unknown_valid = (isinstance(unknown, dict) and unknown.get('Z') == '待核实'
+                             and all(isinstance(code, str) and code not in ('O', 'C')
+                                     and label == '待核实' for code, label in unknown.items()))
+            if not isinstance(tests, dict) or tests.get('positive') != {'O':'进行中','C':'已取消'} or not unknown_valid:
                 missing.append('tests')
         if missing:
             return {'status': 'NEEDS_CLARIFICATION', 'fields': missing,
@@ -343,6 +350,7 @@ def fleet(s, a):
         pid, record = a['person_id'], a['record']
         need(pid in s['contacts'], 'unknown stable identity')
         ids = {m['id'] for m in s['messages'] if m['person_id'] == pid}
+        ids.update(m['id'] for m in s.get('sent_messages', []) if m['recipient_id'] == pid)
         need(record.get('message_id') in ids, 'message belongs to another person or is missing', 'memory_misattribution')
         need(record.get('id') and record.get('kind') in ('fact', 'hypothesis', 'decision', 'commitment'), 'memory id/kind required')
         records = s['memories'].setdefault(pid, [])

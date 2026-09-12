@@ -1,0 +1,62 @@
+{
+  "schema": "starfix-captain-records/v1",
+  "workspace": "captain-logbook",
+  "records": [
+    {
+      "id": "DeepSeek V4.1 Flash-cumulative-157",
+      "model": "DeepSeek V4.1 Flash",
+      "platform": "Grok CLI 1.0.25 / provider: deepseek-flash",
+      "run": "原测＋新增12题补测",
+      "date": "2026-09-11",
+      "version": "1.1.0 · 157项 · d9be075",
+      "difficulty": "hard",
+      "type": "模拟入职",
+      "review": "单评审校准",
+      "verdict": "未通过",
+      "isolation": "未证实",
+      "measured": 157,
+      "total": 157,
+      "wallMinutes": null,
+      "virtualHours": 8,
+      "resets": 4,
+      "updatedAt": "2026-09-11T00:12:19.356510+00:00",
+      "scores": {
+        "K1": 74.17,
+        "K2": 61.9,
+        "K3": 79.17,
+        "K4": 87.5,
+        "K5": 55.3,
+        "K6": 100.0,
+        "K7": 75.0,
+        "K8": 90.56,
+        "K9": 78.12
+      },
+      "stages": {
+        "L1": {
+          "points": 43.0,
+          "max": 60
+        },
+        "L2": {
+          "points": 45.0,
+          "max": 58
+        },
+        "L3": {
+          "points": 24.5,
+          "max": 33
+        },
+        "L4": {
+          "points": 2.5,
+          "max": 6
+        }
+      },
+      "strengths": "新增题能纠正覆盖运行 jar 的顺序、优先核手工起服注入差异，并避免把所有互审红项全推给一方。原模拟激活器依赖答复与去重表现沿用原测。",
+      "weaknesses": "新增题缺 tail -F 历史重放防护；将真实入口缺实现错撤销，反而臆定响应码退回承建；缺监控盲区前置拒绝门；首版 BOM 仍转交确认，操作指引不够直接。原测画像误归因、假回复和交接假入口仍保留。",
+      "caveats": "跨轮累计校准：原142项未重答，新增12题15项得7.5/15；原81.23保留。新题改变K项层间权重，不能将新旧分差当成退步。单评审、网络隔离未完全证实；虚拟八小时、无真实舰员。补测117.277秒，一次调用；全卷墙钟仍未知。新补卷输出usage含provider统计，未强制等额token预算；推理深度仅补测采集。",
+      "evidence": "${STARFIX_EXAMS_DIR}/DeepSeek V4.1 Flash-supplement-01/综合评估.md；实际补卷 examiner/L1-supplement/answer.md；累计 ratings-final.json、score-final.json；冻结 cases.json；原测保存在 baseline/。",
+      "veto": "未命中",
+      "depthSelf": "unknown（补测）；原测未采集",
+      "depthHarness": "未显式指定（补测）",
+      "depthEvidence": "补测 outcome.json：self_report.level=unknown；harness_configured=unknown；runtime_reported=null。"
+    }
+  ]
+}

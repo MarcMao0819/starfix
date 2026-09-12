@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
+import json
+from pathlib import Path
 import watch_world as watch
 import suite_world as world
 
@@ -37,6 +39,14 @@ class WatchWorldTests(unittest.TestCase):
         s=watch.initial_state();watch.apply_event(s,{'id':'E32','at_seconds':28800,'public':{'text':'handoff'},'effects':{}})  # 非端口：虚拟秒数
         self.assertEqual(s['tasks']['T-HANDOFF']['blockers'],['handoff-phase'])
         self.assertIn('/bench/T-HANDOFF.md',s['files'])
+
+    def test_entire_frozen_event_stream_is_releasable_without_hidden_dependencies(self):
+        s=watch.initial_state()
+        events=Path(__file__).resolve().parents[1]/'examiner/events.jsonl'
+        for line in events.read_text().splitlines():watch.apply_event(s,json.loads(line))
+        self.assertIn('violet',s['workers'])
+        self.assertIn('T-HANDOFF',s['tasks'])
+        self.assertTrue(s['data_available'])
 
 
 if __name__=='__main__':unittest.main()

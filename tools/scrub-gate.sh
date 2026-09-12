@@ -69,11 +69,16 @@ declare -a PATNAMES=(
   '舰员真实代号'
 )
 
+# 豁免：benchmarks/captain-v1/results/ 下的评测记录允许绝对日期（评测日期是公开元数据）
+DATE_EXEMPT_DIR="benchmarks/captain-v1/results/"
 for i in "${!PATTERNS[@]}"; do
   # 排除门禁自身与词表样例：它们必须写得出这些模式才能干活
   out=$("$GREP" -REn --binary-files=without-match \
         --exclude-dir=.git --exclude=scrub-gate.sh --exclude='scrub-terms*' \
         "${PATTERNS[$i]}" "$ROOT" 2>/dev/null || true)
+  if [ "${PATNAMES[$i]}" = "绝对日期（使用周期）" ] && [ -n "$out" ]; then
+    out=$(printf '%s\n' "$out" | "$GREP" -v "^$ROOT/$DATE_EXEMPT_DIR" || true)
+  fi
   if [ -n "$out" ]; then
     echo "★ 命中【${PATNAMES[$i]}】："
     printf '%s\n' "$out" | sed "s|^$ROOT/|  |"

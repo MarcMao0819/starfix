@@ -20,6 +20,12 @@ class EntryTests(unittest.TestCase):
     def test_requires_exact_registered_model(self):
         with self.assertRaises(ValueError): entry.read_model(self.config,'other-model')
 
+    def test_dotted_model_id_is_quoted_as_one_toml_key(self):
+        self.config.write_text('[model."fixture.1"]\nmodel="fixture-model"\nbase_url="https://model.example/v1"\napi_key="PRIVATE_FIXTURE_VALUE"\n')
+        with patch.object(entry,'preflight',return_value={}):
+            entry.prepare(self.root/'exam','fixture.1',self.config,'/usr/bin/true')
+        self.assertIn('[model."fixture.1"]',(self.root/'exam/client-state/config.toml').read_text())
+
     def test_unsupported_secret_syntax_does_not_echo_value(self):
         self.config.write_text('[model.fixture]\napi_key = unexpected_PRIVATE_FIXTURE_VALUE\n')
         with self.assertRaises(ValueError) as e: entry.read_model(self.config,'fixture')

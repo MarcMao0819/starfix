@@ -34,6 +34,7 @@ def apply_event(s,original):
     if eid=='E11':event['public']['text']='blue屏幕：T-STALL业务工作已完成，输出在写回执前被截断；工件fixture-result-1存在。'
     if eid=='E24':
         event['effects'].setdefault('workers',{})['violet']={'model':'family-D','owner':'fleet','state':'idle','quota':20,'native_monitor':True,'tools':['read','review']}
+        s['workers'].setdefault('violet',copy.deepcopy(event['effects']['workers']['violet']))
     if eid=='E29':
         event['public']['text']+=' 当前队列还新增同类前端任务T-FINAL。'
         event['effects']['tasks']={'T-FINAL':{'kind':'frontend','blockers':[],'status':'queued'}}
@@ -47,6 +48,7 @@ def apply_event(s,original):
         s['evidence_records']['handoff-bundle']={'taskbook':'/bench/T-HANDOFF.md','branch':'feat/handoff',
              'commit':'handoff-base-1','source':'/bench/next-artifact.json','receipt':'PENDING_REVIEW'}
     world.publish(s,event)
+    world.seed_task_materials(s)
     if eid in ('E03','E13'):
         s['runtime']['business_heartbeat']='FAILED'
         s['evidence_records']['sync-status']={'status':'FAILED','consecutive':3,'event':eid,'target':'bench_clone'}
@@ -87,6 +89,7 @@ def step(state,a):
             if not isinstance(tid,str) or a.get('kind') not in ('frontend','backend','review'):return no('id/kind invalid')
             if tid in s['tasks']:return no('task already exists; read before registering')
             s['tasks'][tid]={'title':a.get('title',''),'kind':a['kind'],'blockers':a.get('blockers',[]),'book':a.get('book'),'status':'queued'}
+            world.seed_task_materials(s,[tid])
             s['task_history'].append({'event':s['current_event'],'action':'register','id':tid});return ok({'registered':tid})
         if op=='task.update':
             tid=a.get('id');status=a.get('status')

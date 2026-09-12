@@ -56,7 +56,7 @@ class ScoreTests(unittest.TestCase):
         half = score.evaluate(self.b, self.d)['core_abilities']['K1']['score']
         self.d['ratings']['S08.1']['process'] = False
         zero = score.evaluate(self.b, self.d)['core_abilities']['K1']['score']
-        self.assertAlmostEqual(100-half, (100-zero)/2, places=2)
+        self.assertAlmostEqual(100-half, (100-zero)/2, delta=0.02)  # 分数保留 2 位小数，题数变化会带来 ≤0.01 的舍入差
 
     def test_every_veto_zeroes_score(self):
         for key in score.FATALS + ['role_violation']:
@@ -228,8 +228,8 @@ class IntegrityTests(unittest.TestCase):
     def test_fixed_question_sets_and_weight_sums(self):
         b=score.bank(); cases=b['cases']; ids=[c['id'] for c in cases]
         self.assertEqual(len(ids),len(set(ids)))
-        self.assertEqual(len(ids),49)
-        self.assertEqual(sum(len(c['checks']) for c in cases),142)
+        self.assertEqual(len(ids),61)
+        self.assertEqual(sum(len(c['checks']) for c in cases),157)
         self.assertEqual(sum(x['weight'] for x in b['competencies'].values()),100)
         self.assertEqual(sum(b['weights'].values()),110)
         self.assertTrue(all(set(x['cases']) <= set(ids) for x in b['competencies'].values()))
