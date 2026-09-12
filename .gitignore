@@ -34,3 +34,4 @@ tools/_gate_counterexample_tmp.*
 # 敏感词表与盐一律不入仓（放 ~/.starfix/，见 tools/scrub-gate.sh 头注）；仓内只留 tools/scrub-terms.sample.txt
 tools/scrub-terms.txt
 tools/scrub-terms.hmac
+benchmarks/captain-v1/results/answers-*.md
