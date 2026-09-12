@@ -35,11 +35,11 @@ bash quickstart/demo.sh
 | grok-4.6 | Grok CLI 1.0.25 · headless | **82.2** | 82 / 60 / 96 / 92 / 62 / 75 / 100 / 91 / 97 | 未通过（否决未命中） |
 | DeepSeek V4.1 Flash | Grok CLI 1.0.25 / provider: deepseek-flash | **76.2** | 74 / 62 / 79 / 88 / 55 / 100 / 75 / 91 / 78 | 未通过（否决未命中） |
 
-![九项能力](docs/img/bench/readme-abilities.svg)
+![九项能力](docs/img/bench/bench-abilities.svg)
 
-![综合分与四层](docs/img/bench/readme-overall.svg)
+![综合分与四层](docs/img/bench/bench-overall.svg)
 
-综合分不是唯一指标：九项能力（K1 角色纪律 20%、K2 舰员画像与派单 15%、K3 工具缺失自恢复 10%、K4 任务书质量 10%、K5 长时运转与交接 10%、K6–K9 见题库）分别打分；困难版阈值为综合 ≥90、K1 ≥95、其余 ≥85，三者目前均未通过。Grok 4.6 与 GPT-6 Astra 为 S04 模拟器误拒校准版（原始分保留）。原始记录、评审摘要与校准说明：[`benchmarks/captain-v1/results/records/`](benchmarks/captain-v1/results/records/)；出题与评分方法：[`benchmarks/captain-v1/README.md`](benchmarks/captain-v1/README.md)。
+综合分不是唯一指标：九项能力（K1 角色纪律 20%、K2 舰员画像与派单 15%、K3 工具缺失自恢复 10%、K4 任务书质量 10%、K5 长时运转与交接 10%、K6–K9 见题库）分别打分；困难版阈值为综合 ≥90、K1 ≥95、其余 ≥85，三者目前均未通过。Grok 4.6 与 GPT-6 Astra 为 S04 模拟器误拒校准版（原始分保留）。完整交互结果页（排行榜、雷达图、逐模型评审卡、失分明细）：**https://marcmao0819.github.io/starfix/bench/** （源码 `benchmarks/captain-v1/report/`，一条命令重生成）。原始记录、评审摘要与校准说明：[`benchmarks/captain-v1/results/records/`](benchmarks/captain-v1/results/records/)；出题与评分方法：[`benchmarks/captain-v1/README.md`](benchmarks/captain-v1/README.md)。
 
 ## 从哪里读
 

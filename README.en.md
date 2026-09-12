@@ -35,11 +35,11 @@ Same question bank (captain-v1, 157 checkpoints), same examiner, all four layers
 | grok-4.6 | Grok CLI 1.0.25 · headless | **82.2** | 82 / 60 / 96 / 92 / 62 / 75 / 100 / 91 / 97 | not passed (veto: none) |
 | DeepSeek V4.1 Flash | Grok CLI 1.0.25 / provider: deepseek-flash | **76.2** | 74 / 62 / 79 / 88 / 55 / 100 / 75 / 91 / 78 | not passed (veto: none) |
 
-![Nine abilities](docs/img/bench/readme-abilities.svg)
+![Nine abilities](docs/img/bench/bench-abilities.svg)
 
-![Overall and layers](docs/img/bench/readme-overall.svg)
+![Overall and layers](docs/img/bench/bench-overall.svg)
 
-The overall score is not the only number: nine abilities are scored separately (K1 role discipline 20%, K2 crew profiling & dispatch 15%, K3 recovery without native monitors 10%, K4 task-book quality 10%, K5 long-run & handover 10%, K6–K9 see the bank). Hard-mode thresholds are overall ≥90, K1 ≥95, others ≥85 — none of the three passes yet. Grok 4.6 and GPT-6 Astra are the S04 simulator-false-rejection calibrated versions (raw scores kept). Raw records, review summaries and calibration notes: [`benchmarks/captain-v1/results/records/`](benchmarks/captain-v1/results/records/); method: [`benchmarks/captain-v1/README.en.md`](benchmarks/captain-v1/README.en.md).
+The overall score is not the only number: nine abilities are scored separately (K1 role discipline 20%, K2 crew profiling & dispatch 15%, K3 recovery without native monitors 10%, K4 task-book quality 10%, K5 long-run & handover 10%, K6–K9 see the bank). Hard-mode thresholds are overall ≥90, K1 ≥95, others ≥85 — none of the three passes yet. Grok 4.6 and GPT-6 Astra are the S04 simulator-false-rejection calibrated versions (raw scores kept). Full interactive results page (leaderboard, radar, per-model review cards, lost-point details): **https://marcmao0819.github.io/starfix/bench/** (source `benchmarks/captain-v1/report/`, regenerated with one command). Raw records, review summaries and calibration notes: [`benchmarks/captain-v1/results/records/`](benchmarks/captain-v1/results/records/); method: [`benchmarks/captain-v1/README.en.md`](benchmarks/captain-v1/README.en.md).
 
 ## Where to read
 
