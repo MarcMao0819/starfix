@@ -1,52 +1,42 @@
 #!/bin/bash
-# send-to-session.sh —— 向另一个终端会话（iTerm2）投递一条消息，两步式 + 读回确认。
+# send-to-session.sh —— 向另一个 iTerm2 会话两步式投递消息，并做折行容忍读回。
 #
-# 为什么要两步：iTerm2 的 `write text ... newline NO` 只把字塞进输入行，不提交；
-# 补一个回车才算发出去。首发回车经常不吃，所以要读回确认。
+# 为什么要两步：iTerm2 的 `write text ... newline NO` 只填入输入行，不提交；
+# 补回车才算真正发送。发送后必须读回确认，避免输入区仍停留未提交文本时误判成功。
 #
-# 为什么要读回：**落盘≠送到**。盲补回车曾把对方正在打的半截消息强行提交出去，
-# 所以补回车前必须确认输入行里停的是我们自己的关键词，是别的内容就绝不回车——
-# 宁可不投，不可误发。
+# 空闲识别用 CLI 数据表：名称 <TAB> 识别特征 <TAB> 空占位正则。
+# 读回前压平 ANSI/框线/空白，因此关键词跨终端折行也能确认。
+# 幂等只按“整条消息 + 近期尾巴”判断；历史里有同关键词不会封死新消息复投。
 #
-# 前置条件（缺一不可，离线环境跑不了，这也是本脚本提供 --dry-run 的原因）：
+# 前置条件：
 #   1) macOS + iTerm2 正在运行，且目标会话仍存在；
-#   2) iTerm2 已开启 Python/AppleScript API：Preferences → General → Magic →
-#      Enable Python API（首次调用会弹授权框，需人工点同意）；
-#   3) 调用方进程有「自动化」权限（系统设置 → 隐私与安全性 → 自动化 → 允许控制 iTerm2）；
-#   4) 会话 ID 必须是现查的（fleet-scan.sh 可列出），**不要手抄**——
-#      抄错的 ID 会表现为「对方忙」，白投一轮。
+#   2) iTerm2 已开启 Python/AppleScript API；
+#   3) 调用方进程有「自动化」权限；
+#   4) 会话 ID 必须现查，不要手抄旧 ID。
 #
 # 用法：
 #   send-to-session.sh <session_id> <message> <keyword>
 #   send-to-session.sh --dry-run <session_id> <message> <keyword>
+#   send-to-session.sh --self-test
 #
-#   <keyword> 是 <message> 的字面子串，用于补回车前的读回确认；
-#   不是子串会直接 KW_NOT_IN_MSG_ABORT（否则读回永远失败 → 无限重投）。
-#
-# 退出码：0=已送达  3=会话不存在/参数不合法  其他=投递未确认
+# 退出码：0=已送达/已确认重复/自测通过；3=参数或目标不合法；2=忙；1=读回未确认。
 
 DRY=0
 if [ "${1:-}" = "--dry-run" ]; then DRY=1; shift; fi
 
-SID="$1"; MSG="$2"; KW="$3"
+SID="${1:-}"
+MSG="${2:-}"
+KW="${3:-}"
+DISPATCH_LOG="${DISPATCH_LOG:-$HOME/fleet-data/dispatch.log}"
 
-if [ "$DRY" = "1" ]; then
-  # 只打印将要做的三步，不调用任何 osascript，不碰任何终端
-  echo "[dry-run] 目标会话 : $SID"
-  echo "[dry-run] 关键词   : $KW"
-  case "$MSG" in *"$KW"*) echo "[dry-run] 关键词是消息子串 : 是（读回确认可用）";;
-                       *) echo "[dry-run] 关键词是消息子串 : 否 → 实投会 KW_NOT_IN_MSG_ABORT";; esac
-  echo "[dry-run] 将执行三步："
-  echo "[dry-run]   ① 读回目标输入行，确认空闲（最多等 30s；非空=对方在打字，放弃）"
-  echo "[dry-run]   ② write text «消息» newline NO   —— 只填入，不提交"
-  echo "[dry-run]   ③ 读回确认输入行里是本条关键词后，补 character id 13 提交；"
-  echo "[dry-run]      读回不到关键词则不补回车（宁可不投，不可误发）"
-  echo "[dry-run] 消息首行 : $(printf '%s' "$MSG" | head -1 | cut -c1-60)"
-  echo "[dry-run] 未触碰任何终端。"
-  exit 0
-fi
-
-
+cli_rules() {
+  cat <<'RULES'
+opencode	• OpenCode [0-9]+\.|┃[[:space:]]*Build ·	ctrl\+p commands|• OpenCode [0-9]+\.|┃[[:space:]]*(Build ·|Build anything)?[[:space:]]*│?[[:space:]]*$
+deepseek	DeepSeek V4|│[[:space:]]*❯	(❯[[:space:]]*Build[[:space:]]+anything[[:space:]]*│?[[:space:]]*$)|(❯[[:space:]]*│?[[:space:]]*$)
+codex	❯|›|»	(^|[[:space:]])(Ask Codex to do anything|Implement \{feature\}|Find and fix a bug in @filename|Write tests for @filename|Run /review on my current changes|Summarize recent commits|Explain this codebase|Use /skills to list available skills)([[:space:]]|$)|Find and fix a bug in @filename|Write tests for @filename|Run /review on my current changes|Summarize recent commits|Explain this codebase|Use /skills to list available skills
+shared-prompt	❯|›|»	(❯|›|»)[[:space:]]*│?[[:space:]]*$
+RULES
+}
 
 read_tail() {
   osascript - "$SID" <<'AS'
@@ -64,30 +54,160 @@ end run
 AS
 }
 
-composer_line() { read_tail | /usr/bin/grep -E '❯|›|»' | tail -1; }
-# 占位灰字白名单：codex 空输入框会显示提示文字，视同空
-is_idle_line() {
-  local L="$1"
-  # <日期>：<某 CLI> 的输入行带右侧边框 │（"│ ❯    …    │"），空提示行以边框结尾也视同空
-  printf '%s' "$L" | /usr/bin/grep -qE '(❯|›|»)[[:space:]]*│?[[:space:]]*$' && return 0
-  printf '%s' "$L" | /usr/bin/grep -qE 'Implement {feature}|Ask Codex to do anything|Find and fix a bug in @filename|Write tests for @filename|Run /review on my current changes|Summarize recent commits|Explain this codebase|Use /skills to list available skills' && return 0
-  return 1
+normalize_text() {
+  python3 -c '
+import re, sys
+text = sys.stdin.read()
+text = re.sub(r"\x1b\][^\x07]*(?:\x07|\x1b\\)?", "", text)
+text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
+text = "".join(ch for ch in text if ch == "\n" or ord(ch) >= 32)
+text = re.sub(r"[│┃┏┓└┘─━]+", "", text)
+sys.stdout.write("".join(text.split()))
+'
 }
 
-# ⓪ 会话存在性：ID 对不上时 read_tail 为空（活会话至少有提示符），与「忙」分开报
-# <日期> 战例27：主窗手写 UUID 后缀，三单被当 COMPOSER_BUSY 空投一轮
-if [ -z "$(read_tail)" ]; then echo "SESSION_NOT_FOUND sid=$SID"; exit 3; fi
+RECENT_LINES=30
 
-# ⓪ 关键词必须是消息的字面子串，否则读回确认永远失败→循环重投（真实事故：同一条给同一舰员排队 3 次）
+recent_tail_text() {
+  printf '%s\n' "$1" | tail -n "$RECENT_LINES"
+}
+
+message_in_recent_tail() {
+  local recent message
+  recent="$(printf '%s\n' "$1" | normalize_text)"
+  message="$(printf '%s\n' "$2" | normalize_text)"
+  [ -n "$message" ] && [[ "$recent" == *"$message"* ]]
+}
+
+self_test() {
+  local history_kw recent_msg
+  history_kw='历史：SF-X 回执'
+  recent_msg='投递自测：SF-X 回执 R2'
+  local full_tail=$'SF-X 回执\n旧状态行\n'"$recent_msg"$'\n状态行'
+  if message_in_recent_tail "$full_tail" "$recent_msg"; then
+    echo 'GREEN_RECENT_FULL_MESSAGE_IDEMPOTENT_PASS'
+  else
+    echo 'GREEN_RECENT_FULL_MESSAGE_IDEMPOTENT_FAIL'
+    return 1
+  fi
+  # Old implementation checked the whole transcript for bare KW. The new matcher
+  # must not treat this as already-delivered when the full message is absent.
+  local old_full_flat="$(printf '%s\n' "$full_tail" | normalize_text)"
+  local old_kw_flat="$(printf '%s\n' 'SF-X 回执' | normalize_text)"
+  if [[ "$old_full_flat" == *"$old_kw_flat"* ]]; then
+    echo 'RED_HISTORY_KEYWORD_ONLY_OLD_RULE_WOULD_BLOCK_PASS'
+  else
+    echo 'RED_HISTORY_KEYWORD_ONLY_OLD_RULE_WOULD_BLOCK_FAIL'
+    return 1
+  fi
+  if ! message_in_recent_tail "$full_tail" '投递自测：全新消息 SF-X 回执 R2'; then
+    echo 'GREEN_HISTORY_ONLY_ALLOWS_NEW_MESSAGE_PASS'
+  else
+    echo 'GREEN_HISTORY_ONLY_ALLOWS_NEW_MESSAGE_FAIL'
+    return 1
+  fi
+}
+
+log_dispatch() {
+  local state="$1"
+  mkdir -p "$(dirname "$DISPATCH_LOG")"
+  printf '%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SID" "$KW" "$state" >> "$DISPATCH_LOG"
+}
+
+detect_cli() {
+  local rule_name recognizer unused
+  while IFS=$'\t' read -r rule_name recognizer unused; do
+    [ -n "$recognizer" ] || continue
+    printf '%s\n' "$TAIL" | /usr/bin/grep -v '^[[:space:]]*$' | tail -5 | /usr/bin/grep -qE "$recognizer" && { printf '%s\n' "$rule_name"; return 0; }
+  done < <(cli_rules)
+  printf '%s\n' "shared-prompt"
+}
+
+idle_regex_for() {
+  local rule_name recognizer idle
+  while IFS=$'\t' read -r rule_name recognizer idle; do
+    [ "$rule_name" = "$1" ] || continue
+    printf '%s\n' "$idle"
+    return 0
+  done < <(cli_rules)
+  printf '%s\n' '(❯|›|»)[[:space:]]*│?[[:space:]]*$'
+}
+
+composer_region() {
+  case "$CLI" in
+    codex)
+      printf '%s\n' "$TAIL" | tail -8 | /usr/bin/grep -E 'Ask Codex to do anything|Implement \{feature\}|Find and fix a bug in @filename|Write tests for @filename|Run /review on my current changes|Summarize recent commits|Explain this codebase|Use /skills to list available skills' | tail -1
+      ;;
+    deepseek)
+      printf '%s\n' "$TAIL" | tail -8 | /usr/bin/grep -E '❯' | tail -1
+      ;;
+    opencode)
+      printf '%s\n' "$TAIL" | tail -12 | /usr/bin/grep -E '┃[[:space:]]*(Build ·|Build anything)|ctrl\+p commands|• OpenCode [0-9]+\.' | tail -1
+      ;;
+    *)
+      printf '%s\n' "$TAIL" | tail -8 | /usr/bin/grep -E '❯|›|»' | tail -1
+      ;;
+  esac
+}
+
+if [ "${1:-}" = "--self-test" ]; then
+  self_test
+  exit $?
+fi
+
+if [ -z "$SID" ] || [ -z "$MSG" ] || [ -z "$KW" ]; then
+  echo "USAGE: $0 [--dry-run] <session_id> <message> <keyword>"
+  exit 3
+fi
+
+if [ "$DRY" = "1" ]; then
+  echo "[dry-run] 目标会话 : $SID"
+  echo "[dry-run] 关键词   : $KW"
+  case "$MSG" in *"$KW"*) echo "[dry-run] 关键词是消息子串 : 是";;
+                       *) echo "[dry-run] 关键词是消息子串 : 否 → KW_NOT_IN_MSG_ABORT";; esac
+  echo "[dry-run] 读回将压平折行/空白/框线后做字面匹配"
+  echo "[dry-run] 幂等：目标尾部已含关键词时不再重投"
+  exit 0
+fi
+
+TAIL="$(read_tail)"
+if [ -z "$TAIL" ]; then
+  echo "SESSION_NOT_FOUND sid=$SID"
+  exit 3
+fi
+
 case "$MSG" in *"$KW"*) ;; *) echo "KW_NOT_IN_MSG_ABORT"; exit 3;; esac
 
-# ① 空闲检查（双采样版）：两次采样均为空/占位且内容一致才算空闲
-for i in $(seq 1 15); do
-  A=$(composer_line); sleep 2; B=$(composer_line)
-  if [ "$A" = "$B" ] && is_idle_line "$A"; then IDLE=1; break; fi
+MSG_FLAT="$(printf '%s' "$MSG" | normalize_text)"
+KW_FLAT="$(printf '%s' "$KW" | normalize_text)"
+RECENT_FLAT="$(recent_tail_text "$TAIL" | normalize_text)"
+
+if message_in_recent_tail "$TAIL" "$MSG"; then
+  echo "ALREADY_DELIVERED sid=$SID keyword=$KW"
+  log_dispatch "already-delivered"
+  exit 0
+fi
+
+CLI="$(detect_cli)"
+IDLE_REGEX="$(idle_regex_for "$CLI")"
+
+IDLE=0
+for attempt in $(seq 1 15); do
+  TAIL="$(read_tail)"
+  A="$(composer_region)"
+  sleep 2
+  TAIL="$(read_tail)"
+  B="$(composer_region)"
+  if [ "$A" = "$B" ] && printf '%s' "$A" | /usr/bin/grep -qE "$IDLE_REGEX"; then
+    IDLE=1
+    break
+  fi
   IDLE=0
 done
-if [ "${IDLE:-0}" != "1" ]; then echo "COMPOSER_BUSY_ABORT"; exit 2; fi
+if [ "$IDLE" != "1" ]; then
+  echo "COMPOSER_BUSY_ABORT cli=$CLI"
+  exit 2
+fi
 
 osascript - "$SID" "$MSG" <<'AS'
 on run argv
@@ -104,10 +224,11 @@ on run argv
         end repeat
       end repeat
     end repeat
+    return "NOT_FOUND"
   end tell
-  return "NOT_FOUND"
 end run
 AS
+
 osascript - "$SID" <<'AS'
 on run argv
   tell application "iTerm2"
@@ -121,19 +242,23 @@ on run argv
         end repeat
       end repeat
     end repeat
+    return "NOT_FOUND"
   end tell
-  return "NOT_FOUND"
 end run
 AS
-# ③ 读回确认；补 CR 仅当输入行里还是我们自己的关键词
-for i in 1 2 3; do
-  sleep 2
-  TAIL=$(read_tail)
-  printf '%s' "$TAIL" | /usr/bin/grep -q "$KW" && {
-    CL=$(printf '%s' "$TAIL" | /usr/bin/grep '❯' | tail -1)
-    if printf '%s' "$CL" | /usr/bin/grep -q "$KW"; then
-      # 关键词还停在输入行=未提交，且是我们自己的文本 → 补一次 CR
-      osascript - "$SID" <<'AS' >/dev/null
+
+sleep 2
+TAIL="$(read_tail)"
+RECENT_FLAT="$(recent_tail_text "$TAIL" | normalize_text)"
+if message_in_recent_tail "$TAIL" "$MSG"; then
+  echo "DELIVERED attempt=1 cli=$CLI"
+  log_dispatch "delivered"
+  exit 0
+fi
+
+COMPOSER_FLAT="$(composer_region | normalize_text)"
+if [[ "$COMPOSER_FLAT" == *"$MSG_FLAT"* ]]; then
+  osascript - "$SID" <<'AS' >/dev/null
 on run argv
   tell application "iTerm2"
     repeat with w in windows
@@ -146,11 +271,16 @@ on run argv
   end tell
 end run
 AS
-      continue
-    fi
-    echo "DELIVERED attempt=$i"; exit 0
-  }
-  # 关键词整屏找不到（被清屏/滚走）——不盲补 CR，直接报未确认
-done
-echo "UNCONFIRMED_NO_BLIND_CR"
+  sleep 2
+  TAIL="$(read_tail)"
+  RECENT_FLAT="$(recent_tail_text "$TAIL" | normalize_text)"
+fi
+
+if message_in_recent_tail "$TAIL" "$MSG"; then
+  echo "DELIVERED attempt=2 cli=$CLI"
+  log_dispatch "delivered"
+  exit 0
+fi
+
+echo "UNCONFIRMED_NO_BLIND_CR cli=$CLI keyword=$KW"
 exit 1
