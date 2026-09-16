@@ -19,10 +19,22 @@
 #   send-to-session.sh --dry-run <session_id> <message> <keyword>
 #   send-to-session.sh --self-test
 #
-# 退出码：0=已送达/已确认重复/自测通过；3=参数或目标不合法；2=忙；1=读回未确认。
+# 测试投递保护：消息含“投递自测：”或“TEST:”时视为测试投递。
+# 默认只能投 tab 标题带 [TEST] 的窗口；对生产窗口放行必须显式 --allow-live。
+#
+# 退出码：0=已送达/已确认重复/自测通过；3=参数或目标不合法；2=忙；
+#         1=读回未确认；4=测试消息命中生产窗口且未 --allow-live。
 
 DRY=0
-if [ "${1:-}" = "--dry-run" ]; then DRY=1; shift; fi
+ALLOW_LIVE=0
+while [ "$#" -gt 0 ]; do
+  case "${1:-}" in
+    --dry-run) DRY=1; shift;;
+    --allow-live) ALLOW_LIVE=1; shift;;
+    --self-test) SELF_TEST_REQUESTED=1; shift;;
+    *) break;;
+  esac
+done
 
 SID="${1:-}"
 MSG="${2:-}"
@@ -79,6 +91,41 @@ message_in_recent_tail() {
   [ -n "$message" ] && [[ "$recent" == *"$message"* ]]
 }
 
+is_test_message() {
+  case "$1" in *'投递自测：'*|*'TEST:'*) return 0;; *) return 1;; esac
+}
+
+is_test_window_title() {
+  case "$1" in *'[TEST]'*|*'[test]'*) return 0;; *) return 1;; esac
+}
+
+read_title() {
+  osascript - "$SID" <<'AS'
+on run argv
+  tell application "iTerm2"
+    repeat with w in windows
+      repeat with t in tabs of w
+        repeat with s in sessions of t
+          if (id of s) is (item 1 of argv) then return (name of t)
+        end repeat
+      end repeat
+    end repeat
+  end tell
+end run
+AS
+}
+
+guard_live_test_delivery() {
+  is_test_message "$MSG" || return 0
+  [ "$ALLOW_LIVE" = "1" ] && return 0
+  local title
+  title="$(read_title)"
+  if is_test_window_title "$title"; then return 0; fi
+  echo "LIVE_TEST_DELIVERY_BLOCKED sid=$SID title=$title"
+  echo "use --allow-live only after confirming this is not a real crew window"
+  return 4
+}
+
 self_test() {
   local history_kw recent_msg
   history_kw='历史：SF-X 回执'
@@ -104,6 +151,18 @@ self_test() {
     echo 'GREEN_HISTORY_ONLY_ALLOWS_NEW_MESSAGE_PASS'
   else
     echo 'GREEN_HISTORY_ONLY_ALLOWS_NEW_MESSAGE_FAIL'
+    return 1
+  fi
+  if is_test_message "$recent_msg" && ! is_test_message 'SF-X 回执'; then
+    echo 'GREEN_TEST_MESSAGE_MARKER_DETECTED_PASS'
+  else
+    echo 'GREEN_TEST_MESSAGE_MARKER_DETECTED_FAIL'
+    return 1
+  fi
+  if is_test_window_title 'timonus测试 [TEST]' && ! is_test_window_title 'timonus二副'; then
+    echo 'GREEN_TEST_WINDOW_TITLE_GATE_PASS'
+  else
+    echo 'GREEN_TEST_WINDOW_TITLE_GATE_FAIL'
     return 1
   fi
 }
@@ -150,7 +209,7 @@ composer_region() {
   esac
 }
 
-if [ "${1:-}" = "--self-test" ]; then
+if [ "${SELF_TEST_REQUESTED:-0}" = "1" ]; then
   self_test
   exit $?
 fi
@@ -169,6 +228,8 @@ if [ "$DRY" = "1" ]; then
   echo "[dry-run] 幂等：目标尾部已含关键词时不再重投"
   exit 0
 fi
+
+guard_live_test_delivery || exit $?
 
 TAIL="$(read_tail)"
 if [ -z "$TAIL" ]; then
