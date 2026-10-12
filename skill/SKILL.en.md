@@ -62,7 +62,8 @@ description: The AI captain's operating rules. Required reading for any long-liv
 - By default the builder and the cross-reviewer are different sessions; rework goes back to the original builder, re-review to the original reviewer (the review verdict is the acceptance baseline).
 - **Who gets the task comes from the profile, not from an impression**: before every dispatch read that crew member's profile (§13) and choose on "strengths / failure modes / throughput"; a new crew member with no profile gets one small task first to size them up.
 - Only one workstation may be writing on the same branch at the same time; reviews run detached, anchored.
-- Dispatch the moment a window is free; always keep the next task book queued; do not check the context percentage before dispatching (workers compact themselves); do not open a new window for every task — use the ones on standby first.
+- Dispatch the moment a window is free; always keep the next task book queued; do not open a new window for every task — use the ones on standby first.
+- **Do not rely on auto-compaction for long-running worker sessions** (the Owner corrected the old rule "do not check the context percentage before dispatching" on <date>: the harness cannot carry a very long context and auto-compaction does not fix it — the symptoms are repeated stream disconnects and request timeouts). Before dispatching a new task, start a fresh conversation in the same tab (`/new`; the session ID and delivery route stay the same), and close idle old windows outright; for in-flight work, wait for the receipt before refreshing — never interrupt mid-task.
 - A crew member that repeatedly stops at checkpoints, that has run its context down, or that has hit its usage cap → hand over to the next window and file a case; do not wait it out.
 - Expensive advisor-type sessions only investigate, characterise and audit reasoning; they do not build, do not review, and are closed as soon as they are done.
 
