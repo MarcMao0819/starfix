@@ -1,0 +1,8 @@
+{
+  "name": "starfix-opencode-adapter-tests",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@opencode-ai/plugin": "1.18.30"
+  }
+}
