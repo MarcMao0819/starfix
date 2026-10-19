@@ -1,0 +1,426 @@
+--- a/scripts/send-to-session.sh
++++ b/scripts/send-to-session.sh
+@@ -21,13 +21,13 @@
+ #   send-to-session.sh --self-test
+ #   send-to-session.sh --classify <屏幕文字文件> [cli]
+ #
+-# SF-SEND-SCRIPT-IDLE-03：限流必须同时满足“位置当前 + 时刻未过”，解析不出落宽松侧；
++# SF-SEND-SCRIPT-IDLE-03：限流必须同时满足“位置当前 + 时刻未过”；当前行解析不出则 UNKNOWN 拒投；
+ # 选择框判 BLOCKING_PROMPT 且零按键；读回失败看“输入框空 + 历史有开头”。
+ #
+ # SF-SEND-SCRIPT-IDLE-04：队列提示行（Claude Code 忙时输入框占位）判 QUEUEABLE 照投，
+ # 送达判据＝投递后队列里出现这条消息；opencode 问题框判 BLOCKING_QUESTION 零按键；
+ # 读回没等到关键词时先看“输入框已清空 + 历史有消息开头”，两者都有即 DELIVERED，
+-# 输入框已清空但历史里没有消息则如实报 NOT_DELIVERED（不是 UNCONFIRMED）；
++# 输入框已清空但没有本次新增消息或 Working 证据则报 UNCONFIRMED_DELIVERY；
+ # 欢迎页 / 空输入框 + 状态栏判空闲。
+ #
+ # SF-SEND-SCRIPT-IDLE-05：现场全屏欢迎页的输入框在页面上部（底 12 行看不到），
+@@ -42,9 +42,9 @@
+ # 测试投递保护：消息含“投递自测：”或“TEST:”时视为测试投递。
+ # 默认只能投 tab 标题带 [TEST] 的窗口；对生产窗口放行必须显式 --allow-live。
+ #
+-# 退出码：0=已送达/已排队/已确认重复/自测通过；3=参数或目标不合法；
++# 退出码：0=已送达/已排队/已确认重复/自测通过；3=参数不合法或状态 UNKNOWN；
+ #         2=目标忙/草稿/限流/等Owner选择/等Owner回答；
+-#         1=读回未确认或未送达（NOT_DELIVERED）；4=测试消息命中生产窗口且未 --allow-live。
++#         1=读回未确认；4=测试消息命中生产窗口且未 --allow-live。
+ 
+ DRY=0
+ ALLOW_LIVE=0
+@@ -54,6 +54,7 @@
+     --allow-live) ALLOW_LIVE=1; shift;;
+     --self-test) SELF_TEST_REQUESTED=1; shift;;
+     --classify) CLASSIFY_MODE=1; CLASSIFY_FILE="${2:-}"; CLASSIFY_CLI="${3:-}"; shift $#;;
++    --simulate) SIM_BEFORE="${2:-}"; SIM_AFTER="${3:-}"; shift 3;;
+     *) break;;
+   esac
+ done
+@@ -65,6 +66,14 @@
+ # IDLE-05 投递台账：只有本脚本实际投出的消息才会在这里留下指纹，供读回幂等比对。
+ DISPATCH_LEDGER="${DISPATCH_LEDGER:-$HOME/fleet-data/dispatch-ledger.tsv}"
+ LEDGER_TTL_SECONDS="${LEDGER_TTL_SECONDS:-1800}"
++SESSION_STATE_PY="${SESSION_STATE_PY:-$HOME/fleet-data/scripts/session-state.py}"
++if [ -n "${SIM_BEFORE:-}" ]; then
++  [ -f "$SIM_BEFORE" ] && [ -f "${SIM_AFTER:-}" ] || { echo 'SIM_FIXTURE_MISSING'; exit 3; }
++  FAKE_SEND=1
++  SIM_STAGE_FILE="$(mktemp -t sf-fleet-send-stage)" || exit 3
++  printf '%s' before > "$SIM_STAGE_FILE"
++  trap 'rm -f "$SIM_STAGE_FILE"' EXIT
++fi
+ 
+ cli_rules() {
+   cat <<'RULES'
+@@ -116,7 +125,7 @@
+ }
+ 
+ parse_codex_reset_epoch() {
+-  # $1=限流行：Codex 文案“将在 <时刻> 重置”→ epoch；无时刻则空（调用方落宽松侧）
++  # $1=限流行：Codex 文案“将在 <时刻> 重置”→ epoch；无时刻则空（调用方判 UNKNOWN）
+   local stamp
+   stamp="$(printf '%s' "$1" | /usr/bin/grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' | head -n 1)"
+   [ -n "$stamp" ] || return 1
+@@ -157,7 +166,7 @@
+ }
+ 
+ rate_is_current_and_active() {
+-  # 限流当且仅当：位置当前（末状态行）且重置时刻晚于现在。解析不出 → 不算限流（落宽松侧）。
++  # 限流当且仅当：位置当前（末状态行）且重置时刻晚于现在；解析不出由后续 UNKNOWN 闸处理。
+   local rline rtext ep now
+   rline="$(rate_position_current_line "$1" "$2")" || return 1
+   rtext="$(printf '%s\n' "$2" | sed -n "${rline}p")"
+@@ -168,7 +177,7 @@
+ }
+ 
+ rate_last_line_unparsed() {
+-  # 位置当前但解不出时刻 → 0（调用方输出 rate_limit_unparsed=1 并走宽松侧）
++  # 位置当前但解不出时刻 → 0（调用方输出 UNKNOWN，不按空闲投递）。
+   local rline rtext
+   rline="$(rate_position_current_line "$1" "$2")" || return 1
+   rtext="$(printf '%s\n' "$2" | sed -n "${rline}p")"
+@@ -318,6 +327,10 @@
+ }
+ 
+ read_tail() {
++  if [ -n "${SIM_STAGE_FILE:-}" ]; then
++    if [ "$(cat "$SIM_STAGE_FILE")" = after ]; then cat "$SIM_AFTER"; else cat "$SIM_BEFORE"; fi
++    return 0
++  fi
+   osascript - "$SID" <<'AS'
+ on run argv
+   tell application "iTerm2"
+@@ -509,25 +522,25 @@
+   expected='TARGET_RATE_LIMITED';actual="$(classify_composer opencode "$t")"
+   [[ "$actual" == "$expected" ]] && echo 'FIX_RATE_CURRENT_OPENCODE_PASS' || { echo "FIX_RATE_CURRENT_OPENCODE_FAIL actual=$actual";return 1; }
+ 
+-  # 判据3：末尾限流但解析不出时刻 → IDLE（宽松侧）+ rate_limit_unparsed=1。
++  # 判据3：末尾限流但解析不出时刻 → UNKNOWN + rate_limit_unparsed=1。
+   t="$(cat "$fixdir/rate-unparsed-codex.txt")"
+-  expected='IDLE';actual="$(classify_composer codex "$t")"
+-  [[ "$actual" == "$expected" ]] && echo 'FIX_RATE_UNPARSED_LOOSE_IDLE_PASS' || { echo "FIX_RATE_UNPARSED_LOOSE_IDLE_FAIL actual=$actual";return 1; }
++  expected='UNKNOWN';actual="$(classify_composer codex "$t")"
++  [[ "$actual" == "$expected" ]] && echo 'FIX_RATE_UNPARSED_UNKNOWN_PASS' || { echo "FIX_RATE_UNPARSED_UNKNOWN_FAIL actual=$actual";return 1; }
+   if rate_last_line_unparsed codex "$t"; then
+     echo 'FIX_RATE_UNPARSED_FLAG_PASS'
+   else
+     echo 'FIX_RATE_UNPARSED_FLAG_FAIL';return 1
+   fi
+ 
+-  # TARGET_WORKING 取末状态：历史 Working + 新回合干净提示符 → IDLE。
++  # 历史 Working 后有新输出且缺少明确 done：不猜空闲，落 UNKNOWN。
+   t="$(cat "$fixdir/working-history-stale-codex.txt")"
+-  expected='IDLE';actual="$(classify_composer codex "$t")"
+-  [[ "$actual" == "$expected" ]] && echo 'FIX_WORKING_HISTORY_STALE_IDLE_PASS' || { echo "FIX_WORKING_HISTORY_STALE_IDLE_FAIL actual=$actual";return 1; }
+-
+-  # DRAFT_PRESENT 取末状态：历史草稿掉出 12 行窗口且末状态无输入框 → BUSY（旧 30 行窗口误判 DRAFT）。
++  expected='UNKNOWN';actual="$(classify_composer codex "$t")"
++  [[ "$actual" == "$expected" ]] && echo 'FIX_WORKING_HISTORY_STALE_UNKNOWN_PASS' || { echo "FIX_WORKING_HISTORY_STALE_UNKNOWN_FAIL actual=$actual";return 1; }
++
++  # 历史草稿掉出末状态且无当前输入框：UNKNOWN，不能猜 BUSY/IDLE。
+   t="$(cat "$fixdir/draft-stale-no-composer-codex.txt")"
+-  expected='BUSY';actual="$(classify_composer codex "$t")"
+-  [[ "$actual" == "$expected" ]] && echo 'FIX_DRAFT_STALE_NO_COMPOSER_BUSY_PASS' || { echo "FIX_DRAFT_STALE_NO_COMPOSER_BUSY_FAIL actual=$actual";return 1; }
++  expected='UNKNOWN';actual="$(classify_composer codex "$t")"
++  [[ "$actual" == "$expected" ]] && echo 'FIX_DRAFT_STALE_NO_COMPOSER_UNKNOWN_PASS' || { echo "FIX_DRAFT_STALE_NO_COMPOSER_UNKNOWN_FAIL actual=$actual";return 1; }
+ 
+   # 判据C1：选择框 → BLOCKING_PROMPT，且全过程零按键。red_when：删掉识别即不再拦截。
+   t="$(cat "$fixdir/blocking-select-claude.txt")"
+@@ -583,11 +596,11 @@
+     echo 'IDLE04_QUEUED_MESSAGE_VISIBLE_FAIL';return 1
+   fi
+ 
+-  # 报错窗：末尾是供应商报错且输入框空闲 → IDLE；消息没进输入框 → NOT_DELIVERED（不是 UNCONFIRMED）。
++  # 报错窗：供应商限流没有可信重置时刻 → UNKNOWN，不能因输入框空就投递。
+   local error_msg='TEST: 报错窗夹具消息请忽略报错ABC1234'
+   t="$(cat "$fixdir/error-window-idle-opencode.txt")"
+-  expected='IDLE';actual="$(classify_composer opencode "$t")"
+-  [[ "$actual" == "$expected" ]] && echo 'IDLE04_ERROR_WINDOW_IDLE_PASS' || { echo "IDLE04_ERROR_WINDOW_IDLE_FAIL actual=$actual";return 1; }
++  expected='UNKNOWN';actual="$(classify_composer opencode "$t")"
++  [[ "$actual" == "$expected" ]] && echo 'IDLE04_ERROR_WINDOW_UNKNOWN_PASS' || { echo "IDLE04_ERROR_WINDOW_UNKNOWN_FAIL actual=$actual";return 1; }
+   t="$(cat "$fixdir/error-window-postsend-notdelivered-opencode.txt")"
+   if not_delivered_confirmed opencode "$t" "$error_msg"; then
+     echo 'IDLE04_ERROR_WINDOW_NOT_DELIVERED_PASS'
+@@ -699,11 +712,11 @@
+   fi
+   rm -rf "$ldir"
+ 
+-  # SF-SEND-SCRIPT-IDLE-05 补充：Claude Code 底部面板版式（输入框在面板上方、屏幕下方留白，
+-  # 状态栏含 1 feedback draft）判 IDLE；输入框真草稿 + 同样状态栏仍判草稿、零落键。
++  # Claude Code 真实运行态含“Blanching… (running hook)”而无 esc to interrupt：
++  # 先判 WORKING；状态栏的 feedback draft 不等于输入框草稿，输入框真草稿仍单独拦下。
+   t="$(cat "$fixdir/claude-statusbar-feedback-draft-fullscreen-20260918.txt")"
+-  expected='IDLE';actual="$(classify_composer shared-prompt "$t")"
+-  [[ "$actual" == "$expected" ]] && echo 'IDLE05_CLAUDE_FEEDBACK_DRAFT_IDLE_PASS' || { echo "IDLE05_CLAUDE_FEEDBACK_DRAFT_IDLE_FAIL actual=$actual";return 1; }
++  expected='WORKING';actual="$(classify_composer shared-prompt "$t")"
++  [[ "$actual" == "$expected" ]] && echo 'IDLE05_CLAUDE_RUNNING_HOOK_WORKING_PASS' || { echo "IDLE05_CLAUDE_RUNNING_HOOK_WORKING_FAIL actual=$actual";return 1; }
+   t="$(cat "$fixdir/claude-statusbar-feedback-draft-composer-draft-20260918.txt")"
+   expected='DRAFT_PRESENT';actual="$(classify_composer shared-prompt "$t")"
+   [[ "$actual" == "$expected" ]] && echo 'IDLE05_CLAUDE_FEEDBACK_DRAFT_COMPOSER_DRAFT_PASS' || { echo "IDLE05_CLAUDE_FEEDBACK_DRAFT_COMPOSER_DRAFT_FAIL actual=$actual";return 1; }
+@@ -711,7 +724,7 @@
+   expected='请把这两单复审意见先发我 IDFP05'
+   [[ "$actual" == "$expected" ]] && echo 'IDLE05_CLAUDE_COMPOSER_DRAFT_PREVIEW_PASS' || { echo "IDLE05_CLAUDE_COMPOSER_DRAFT_PREVIEW_FAIL actual=$actual";return 1; }
+   actual="$(bash "${BASH_SOURCE[0]}" --classify "$fixdir/claude-statusbar-feedback-draft-fullscreen-20260918.txt" | head -n 1)"
+-  expected='STATE=IDLE cli=shared-prompt'
++  expected='STATE=WORKING cli=claude'
+   [[ "$actual" == "$expected" ]] && echo 'IDLE05_CLAUDE_CLASSIFY_REAL_PASS' || { echo "IDLE05_CLAUDE_CLASSIFY_REAL_FAIL actual=$actual";return 1; }
+ }
+ 
+@@ -758,7 +771,9 @@
+ }
+ 
+ detect_cli() {
+-  local rule_name recognizer unused
++  local rule_name recognizer unused common_cli
++  common_cli="$(printf '%s' "$TAIL" | python3 "$SESSION_STATE_PY" --format cli)"
++  if [ "$common_cli" = claude ]; then printf '%s\n' claude; return 0; fi
+   while IFS=$'\t' read -r rule_name recognizer unused; do
+     [ -n "$recognizer" ] || continue
+     printf '%s\n' "$TAIL" | /usr/bin/grep -v '^[[:space:]]*$' | tail -5 | /usr/bin/grep -qE "$recognizer" && { printf '%s\n' "$rule_name"; return 0; }
+@@ -777,19 +792,19 @@
+ }
+ 
+ composer_region() {
+-  # 末状态窗口：输入框永远在底部，只看最后 12 行，历史草稿不得参与判定。
++  # 在完整当前屏幕文字中找最后一条输入行；不把大窗口的底 12 行当成完整状态。
+   case "$CLI" in
+     codex)
+-      printf '%s\n' "$TAIL" | tail -12 | /usr/bin/grep -E '❯|›|»|Ask Codex to do anything|Implement \{feature\}|Find and fix a bug in @filename|Write tests for @filename|Run /review on my current changes|Summarize recent commits|Explain this codebase|Use /skills to list available skills' | tail -1
++      printf '%s\n' "$TAIL" | /usr/bin/grep -E '^[[:space:]]*[❯›»]|Ask Codex to do anything|Implement \{feature\}|Find and fix a bug in @filename|Write tests for @filename|Run /review on my current changes|Summarize recent commits|Explain this codebase|Use /skills to list available skills' | tail -1
+       ;;
+     deepseek)
+-      printf '%s\n' "$TAIL" | tail -12 | /usr/bin/grep -E '❯' | tail -1
++      printf '%s\n' "$TAIL" | /usr/bin/grep -E '^[[:space:]]*❯' | tail -1
+       ;;
+     opencode)
+       printf '%s\n' "$TAIL" | tail -12 | /usr/bin/grep -E '┃|• OpenCode [0-9]+\.' | tail -1
+       ;;
+     *)
+-      printf '%s\n' "$TAIL" | tail -12 | /usr/bin/grep -E '❯|›|»' | tail -1
++      printf '%s\n' "$TAIL" | /usr/bin/grep -E '^[[:space:]]*[❯›»]' | tail -1
+       ;;
+   esac
+ }
+@@ -822,7 +837,7 @@
+ }
+ 
+ classify_composer() {
+-  local cli="$1" tail="$2" line text
++  local cli="$1" tail="$2" line text common_state
+   # 历史文本 ≠ 当前状态：只看末状态。
+   # 顺序：选择框/问题框 > 队列提示 > Working > 限流（双条件）> 输入框末行 > 欢迎页。
+   if is_blocking_prompt "$tail"; then
+@@ -837,13 +852,29 @@
+     printf '%s\n' 'QUEUEABLE'
+     return 0
+   fi
+-  if working_is_current "$cli" "$tail"; then
++  if [[ "$cli" == codex || "$cli" == shared-prompt || "$cli" == claude ]]; then
++    common_state="$(printf '%s' "$tail" | python3 "$SESSION_STATE_PY" --format state --cli "$cli")"
++    case "$common_state" in
++      WORKING|WAITING|DRAFT_PRESENT|BLOCKING_UPDATE) printf '%s\n' "$common_state"; return 0;;
++    esac
++  fi
++  if [[ "$cli" != codex && "$cli" != shared-prompt && "$cli" != claude ]] && working_is_current "$cli" "$tail"; then
+     printf '%s\n' 'WORKING'
+     return 0
+   fi
+   if rate_is_current_and_active "$cli" "$tail"; then
+     printf '%s\n' 'TARGET_RATE_LIMITED'
+     return 0
++  fi
++  if rate_last_line_unparsed "$cli" "$tail"; then
++    printf '%s\n' 'UNKNOWN'
++    return 0
++  fi
++  if [[ "$cli" == codex || "$cli" == shared-prompt || "$cli" == claude ]]; then
++    case "$common_state" in
++      IDLE) printf '%s\n' 'IDLE'; return 0;;
++      UNKNOWN|'') printf '%s\n' 'UNKNOWN'; return 0;;
++    esac
+   fi
+   line="$(composer_line_for "$cli" "$tail")"
+   text=""
+@@ -889,7 +920,7 @@
+       printf '%s\n' 'IDLE'
+       return 0
+     fi
+-    printf '%s\n' 'BUSY'
++    printf '%s\n' 'UNKNOWN'
+     return 0
+   fi
+   printf '%s\n' 'DRAFT_PRESENT'
+@@ -938,7 +969,7 @@
+ 
+ send_step2_cr() {
+   # $1=sid：补回车提交。FAKE_SEND=1 时只计数不按键。
+-  if [ "${FAKE_SEND:-0}" = "1" ]; then printf 'KEY step2-cr\n' >> "${FAKE_KEYLOG:-/dev/null}"; printf 'STEP2_OK\n'; return 0; fi
++  if [ "${FAKE_SEND:-0}" = "1" ]; then printf 'KEY step2-cr\n' >> "${FAKE_KEYLOG:-/dev/null}"; [ -z "${SIM_STAGE_FILE:-}" ] || printf '%s' after > "$SIM_STAGE_FILE"; printf 'STEP2_OK\n'; return 0; fi
+   osascript - "$1" <<'AS'
+ on run argv
+   tell application "iTerm2"
+@@ -997,6 +1028,24 @@
+   printf '%s' "$recent" | /usr/bin/grep -qF -- "$head"
+ }
+ 
++normalized_count() {
++  # $1=屏幕 $2=片段：折行/框线归一后计数，供投递前后差分；历史引文不算本次送达。
++  local needle
++  needle="$(printf '%s' "$2" | normalize_text)"
++  printf '%s' "$1" | normalize_text | python3 -c 'import sys; needle=sys.argv[1]; body=sys.stdin.read(); print(body.count(needle) if needle else 0)' "$needle"
++}
++
++new_message_evidence() {
++  # $1=投递前屏幕 $2=投递后屏幕 $3=消息：完整消息或前 16 字新增一次才算。
++  local head before after
++  head="$(printf '%s' "$3" | normalize_text | python3 -c 'import sys; print(sys.stdin.read()[:16],end="")')"
++  before="$(normalized_count "$1" "$3")"; after="$(normalized_count "$2" "$3")"
++  [ "$after" -gt "$before" ] && return 0
++  [ -n "$head" ] || return 1
++  before="$(normalized_count "$1" "$head")"; after="$(normalized_count "$2" "$head")"
++  [ "$after" -gt "$before" ]
++}
++
+ composer_is_clean() {
+   # $1=cli $2=屏幕文字：输入框末行存在且去掉标记后为空 → 0。
+   # 没有输入框行不算“已清空”，避免把无输入框的忙态误判成没送达。
+@@ -1026,6 +1075,10 @@
+   if [ -n "${CLASSIFY_CLI:-}" ]; then cli="$CLASSIFY_CLI"; else TAIL="$tail"; cli="$(detect_cli)"; fi
+   st="$(classify_composer "$cli" "$tail")"
+   printf 'STATE=%s cli=%s\n' "$st" "$cli"
++  if [ "$st" = UNKNOWN ]; then
++    blocker="$(printf '%s' "$tail" | python3 "$SESSION_STATE_PY" --format blocker)"
++    [ -z "$blocker" ] || printf 'blocker=%s\n' "$blocker"
++  fi
+   if rate_last_line_unparsed "$cli" "$tail"; then printf 'rate_limit_unparsed=1\n'; fi
+   if [ "$st" = "BLOCKING_QUESTION" ]; then
+     printf 'question_first_line=%s\n' "$(question_first_line "$tail")"
+@@ -1117,6 +1170,16 @@
+       log_dispatch "target-working"
+       exit 2
+       ;;
++    WAITING)
++      echo "TARGET_WAITING cli=$CLI detail=后台终端仍在运行，不是空闲"
++      log_dispatch "target-waiting"
++      exit 2
++      ;;
++    BLOCKING_UPDATE)
++      echo "BLOCKING_UPDATE cli=$CLI detail=目标窗在等更新选择，零按键"
++      log_dispatch "blocking-update"
++      exit 2
++      ;;
+     TARGET_RATE_LIMITED)
+       echo "TARGET_RATE_LIMITED cli=$CLI"
+       log_dispatch "target-rate-limited"
+@@ -1127,68 +1190,58 @@
+       log_dispatch "draft-present"
+       exit 2
+       ;;
++    UNKNOWN)
++      blocker="$(printf '%s' "$TAIL" | python3 "$SESSION_STATE_PY" --format blocker)"
++      if [ "$blocker" = UPDATE_PROMPT ]; then
++        echo "TARGET_UNKNOWN cli=$CLI reason=update-prompt-do-not-send detail=更新选择框只读取样，零按键；请报舰长"
++      else
++        echo "TARGET_UNKNOWN cli=$CLI detail=无法可靠判定最后状态，零按键"
++      fi
++      log_dispatch "target-unknown"
++      exit 3
++      ;;
+   esac
+   sleep 1
+ done
+ if [ -z "$TARGET_STATE" ] || { [ "$TARGET_STATE" != "IDLE" ] && [ "$QUEUED_WHILE_WORKING" != "1" ]; }; then
+-  echo "COMPOSER_BUSY_ABORT cli=$CLI state=${TARGET_STATE:-UNKNOWN}"
+-  exit 2
++  echo "TARGET_UNKNOWN cli=$CLI state=${TARGET_STATE:-UNKNOWN} detail=未识别当前状态，零按键"
++  exit 3
+ fi
+ 
+-send_step1 "$SID" "$MSG"
+-send_step2_cr "$SID"
+-
+-sleep 2
+-TAIL="$(read_tail)"
+-if [ "$QUEUED_WHILE_WORKING" = "1" ]; then
+-  for attempt in $(seq 1 5); do
+-    if message_in_recent_tail "$TAIL" "$MSG" || message_head_in_tail "$TAIL" "$MSG"; then
+-      echo "QUEUED attempt=$attempt cli=$CLI"
++BEFORE_TAIL="$TAIL"
++STEP1="$(send_step1 "$SID" "$MSG")"
++if [ "$STEP1" != STEP1_OK ]; then
++  echo "UNCONFIRMED_DELIVERY cli=$CLI detail=填入输入框未获确认，未按回车"
++  log_dispatch "step1-unconfirmed"
++  exit 1
++fi
++STEP2="$(send_step2_cr "$SID")"
++if [ "$STEP2" != STEP2_OK ]; then
++  echo "UNCONFIRMED_DELIVERY cli=$CLI detail=回车提交未获确认，不补盲回车"
++  log_dispatch "step2-unconfirmed"
++  exit 1
++fi
++
++for attempt in $(seq 1 5); do
++  sleep 2
++  TAIL="$(read_tail)"
++  POST_STATE="$(classify_composer "$CLI" "$TAIL")"
++  if [ "$QUEUED_WHILE_WORKING" = "1" ]; then
++    if [[ "$POST_STATE" != DRAFT_PRESENT && "$POST_STATE" != BLOCKING_UPDATE && "$POST_STATE" != UNKNOWN ]] && new_message_evidence "$BEFORE_TAIL" "$TAIL" "$MSG"; then
++      echo "QUEUED attempt=$attempt cli=$CLI evidence=new-message"
+       ledger_record "$SID" "$MSG" "$KW" || echo "LEDGER_WRITE_FAILED ledger=$DISPATCH_LEDGER"
+       log_dispatch "queued"
+       exit 0
+     fi
+-    sleep 2
+-    TAIL="$(read_tail)"
+-  done
+-  echo "QUEUED_UNCONFIRMED cli=$CLI keyword=$KW"
+-  log_dispatch "queued-unconfirmed"
+-  exit 1
+-fi
+-if message_in_recent_tail "$TAIL" "$MSG"; then
+-  echo "DELIVERED attempt=1 cli=$CLI"
+-  ledger_record "$SID" "$MSG" "$KW" || echo "LEDGER_WRITE_FAILED ledger=$DISPATCH_LEDGER"
+-  log_dispatch "delivered"
+-  exit 0
+-fi
+-
+-COMPOSER_FLAT="$(composer_region | normalize_text)"
+-if [[ "$COMPOSER_FLAT" == *"$MSG_FLAT"* ]]; then
+-  send_blind_cr "$SID" >/dev/null
+-  sleep 2
+-  TAIL="$(read_tail)"
+-  RECENT_FLAT="$(recent_tail_text "$TAIL" | normalize_text)"
+-fi
+-
+-if message_in_recent_tail "$TAIL" "$MSG"; then
+-  echo "DELIVERED attempt=2 cli=$CLI"
+-  ledger_record "$SID" "$MSG" "$KW" || echo "LEDGER_WRITE_FAILED ledger=$DISPATCH_LEDGER"
+-  log_dispatch "delivered"
+-  exit 0
+-fi
+-
+-if confirm_fast_consume "$TAIL" "$CLI" "$MSG"; then
+-  echo "DELIVERED attempt=fast-confirm cli=$CLI"
+-  ledger_record "$SID" "$MSG" "$KW" || echo "LEDGER_WRITE_FAILED ledger=$DISPATCH_LEDGER"
+-  log_dispatch "delivered-fast-confirm"
+-  exit 0
+-fi
+-
+-if not_delivered_confirmed "$CLI" "$TAIL" "$MSG"; then
+-  echo "NOT_DELIVERED cli=$CLI keyword=$KW detail=输入框已清空且历史里没有消息"
+-  log_dispatch "not-delivered"
+-  exit 1
+-fi
+-
+-echo "UNCONFIRMED_NO_BLIND_CR cli=$CLI keyword=$KW"
++  elif [[ "$POST_STATE" == WORKING && "$TARGET_STATE" == IDLE ]] || {
++      [[ "$POST_STATE" == WORKING || "$POST_STATE" == WAITING || "$POST_STATE" == IDLE ]] && new_message_evidence "$BEFORE_TAIL" "$TAIL" "$MSG";
++    }; then
++    echo "DELIVERED attempt=$attempt cli=$CLI evidence=working-or-new-history"
++    ledger_record "$SID" "$MSG" "$KW" || echo "LEDGER_WRITE_FAILED ledger=$DISPATCH_LEDGER"
++    log_dispatch "delivered"
++    exit 0
++  fi
++done
++echo "UNCONFIRMED_DELIVERY cli=$CLI keyword=$KW detail=未见新Working或新消息历史，未补盲回车"
++log_dispatch "unconfirmed-delivery"
+ exit 1

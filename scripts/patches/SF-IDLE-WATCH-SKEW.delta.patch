@@ -1,0 +1,65 @@
+--- a/fleet-data/scripts/crew-idle-watch.sh
++++ b/fleet-data/scripts/crew-idle-watch.sh
+@@ -29,17 +29,44 @@
+ }
+ 
+ done_epoch() {
+-  local value="$1" today="$(date +%Y-%m-%d)" parsed
++  local value="$1" now_epoch="${2:-$(date +%s)}" today parsed
++  today="$(date -r "$now_epoch" +%Y-%m-%d)"
+   if [[ "$value" == *[AP]M ]]; then
+-    parsed="$(LC_ALL=C date -j -f '%Y-%m-%d %I:%M %p' "$today $value" +%s 2>/dev/null)"
++    parsed="$(LC_ALL=C date -j -f '%Y-%m-%d %I:%M:%S %p' "$today ${value% *}:00 ${value##* }" +%s 2>/dev/null)"
+   else
+-    parsed="$(LC_ALL=C date -j -f '%Y-%m-%d %H:%M' "$today $value" +%s 2>/dev/null)"
++    parsed="$(LC_ALL=C date -j -f '%Y-%m-%d %H:%M:%S' "$today $value:00" +%s 2>/dev/null)"
+   fi
+   [[ -n "$parsed" ]] && print -r -- "$parsed"
+ }
+ 
++age_since_epoch() {
++  local now="$1" ts="$2"
++  # 同一分钟的秒级竞争不得当成昨天；真正跨午夜才会超过两分钟。
++  (( ts > now + 120 )) && ts=$((ts - 86400))
++  (( ts > now )) && ts=$now
++  print -r -- "$(((now - ts) / 60))|$ts"
++}
++
++age_since_done() {
++  local now="$1" done_time="$2" ts
++  ts="$(done_epoch "$done_time" "$now")"
++  [[ -n "$ts" ]] || return 1
++  age_since_epoch "$now" "$ts"
++}
++
++if [[ "${1:-}" == '--age-fixture' ]]; then
++  [[ "${2:-}" == <-> && -n "${3:-}" ]] || { echo 'UNKNOWN reason=fixture-arguments'; exit 3; }
++  age_since_done "$2" "$3"
++  exit $?
++fi
++if [[ "${1:-}" == '--age-epoch-fixture' ]]; then
++  [[ "${2:-}" == <-> && "${3:-}" == <-> ]] || { echo 'UNKNOWN reason=fixture-arguments'; exit 3; }
++  age_since_epoch "$2" "$3"
++  exit $?
++fi
++
+ one_pass() {
+-  local now="$(date +%s)" i text result state cli done_time ts idle key
++  local now="$(date +%s)" i text result state cli done_time ts idle age key
+   for i in {1..6}; do
+     text="$(read_screen "${ids[$i]}" 2>/dev/null)" || text=''
+     if [[ -z "$text" || "$text" == '__SESSION_GONE__' ]]; then
+@@ -55,10 +82,9 @@
+           echo "${names[$i]} UNKNOWN reason=idle-time-unavailable"
+           continue
+         fi
+-        ts="$(done_epoch "$done_time")"
+-        if [[ -z "$ts" ]]; then echo "${names[$i]} UNKNOWN reason=done-time-unparsed"; continue; fi
+-        (( ts > now )) && ts=$((ts - 86400))
+-        idle=$(((now - ts) / 60))
++        age="$(age_since_done "$now" "$done_time")"
++        if [[ -z "$age" ]]; then echo "${names[$i]} UNKNOWN reason=done-time-unparsed"; continue; fi
++        IFS='|' read -r idle ts <<< "$age"
+         key="${names[$i]}	$(date -r "$ts" +%Y-%m-%d) $done_time"
+         if (( idle >= 10 )) && ! /usr/bin/grep -qxF "$key" "$TOLD"; then
+           echo "${names[$i]} 空闲 ${idle} 分钟（done $done_time）"
