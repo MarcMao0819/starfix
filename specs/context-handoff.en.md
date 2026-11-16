@@ -34,3 +34,24 @@ Files are split by `session_id`: when another session compacts it will not read 
 - Two-state self-proof: `scripts/hooks/test-ctx-handoff-guard.sh` runs 17 cases in a temp directory (50% silent, 86% fires and writes the snapshot, no repeat within a cycle, Stop blocks once and only once, 92% second level, reset after usage drops then fires again, allowlist match by iTerm UUID, SessionStart injects the whole hand-written section and truncates the snapshot, no handoff file means no output); the same suite with the threshold set to 99 must fail.
 - Run the SessionStart script once with fake stdin (containing a real session_id); stdout must contain `<handoff` and the hand-written section; with a session_id that does not exist it must produce zero output.
 - The handoff document has exactly one criterion: the successor can correctly dispatch the first task within 10 minutes without asking anyone.
+
+## 5. Handoff at a token line (a steward outside the session)
+
+The guard in section 2 lives inside the session. With a million-token window 85% comes far too late, so a resident program outside the session also watches the snapshot table, with one state machine per managed session:
+
+1. **Over the line**: the token count or the percentage in the snapshot passes its line, and the session has been active in the last few minutes (an idle session is not interrupted; it is handled the next time it wakes).
+2. **Ask for the card**: type one message into its input box asking it to finalise the hand-written part of the handoff card and then reply with an agreed word on a line of its own.
+3. **Check two things**: the hand-written part really changed after the notice (compare digests, and it is not the empty template), and the agreed word appears on screen after the notice. Proceed only when both hold.
+4. **Clear the session**: send the clear command only when the input box is empty and the turn has ended; then wait for the session id to change.
+5. **Tell the new session to read the card**: give it its role and the old card's path, ask it to reply with an agreed word once it has read it, then carry on.
+6. **Stop whenever a step is uncertain**: record a "needs a human" entry; do not resend and do not guess.
+
+Rules for setting the line:
+
+- The line can be set per session; the default sits below the vendor's long-context surcharge threshold.
+- When a session is first brought under management, run it once with a generous line, measure where it lands after the handoff, and only then decide whether a lower line fits.
+- The steward writes its own heartbeat, and the daily routine check reads it. Before changing its configuration, confirm no session is in the middle of a handoff.
+
+Checklist for the hand-written part of the card (attached to the notice; no length limit): the current state; every piece of work in flight (who, which step, the criterion, the next step, the deadline); what the owner decided in this session (with the original words); what was tried and did not work; what was promised to others and what is awaited from them; what this session only just worked out; paths to evidence and receipts; how to re-attach timers and monitors; and whatever is still valid from the previous card, carried over.
+
+The reference implementation is not in this repository yet.
