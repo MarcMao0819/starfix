@@ -1,0 +1,21 @@
+{
+  "_说明": "运行恢复脚本后生成的登记表样例；初始可只保留 secretary 占位。iterm 为 iTerm 会话 ID（全大写）。",
+  "captain": {
+    "name": "主舰长",
+    "iterm": "11111111",
+    "old": "占位",
+    "session": "sess-captain-placeholder",
+    "cmd": "cd $FLEET_HOME && claude --resume 会话占位",
+    "at": "占位",
+    "ok": true
+  },
+  "secretary": {
+    "name": "书记",
+    "iterm": "22222222",
+    "old": "占位",
+    "session": "sess-secretary-placeholder",
+    "cmd": "cd $FLEET_HOME && claude --resume 会话占位",
+    "at": "占位",
+    "ok": true
+  }
+}

@@ -58,13 +58,30 @@ Secret precedence: the `IM_APP_SECRET` environment variable → `app_secret_file
 export IM_APP_SECRET="$(cat ~/.secrets/im-app-secret)"   # recommended
 ```
 
-## 4. Behaviour switches
+## 4. Context steward and fleet recovery
+
+| Variable | Default | Used by |
+|---|---|---|
+| `CTX_SNAPSHOT_DIR` | `~/.claude/ctx-snapshot` | Snapshot table; steward and recovery read `by-iterm/*.json` |
+| `STEWARD_TARGETS_JSON` | `$FLEET_HOME/steward/targets.json` | Steward config (copy from `scripts/steward/targets.sample.json`) |
+| `STEWARD_DATA_DIR` | `data_dir` in config | Steward state, logs, lock file |
+| `STEWARD_DIR` | `scripts/steward` in the repo | Where `open-steward.py` runs `run.sh` |
+| `FLEET_HANDOFF_DIR` | `$FLEET_HOME/handoff` | Handoff cards `HANDOFF-<session>.md` |
+| `FLEET_RECOVERY_TABLE` | `$FLEET_HOME/recovery/fleet-table.json` | Window registry after recovery |
+| `FLEET_ROSTER_JSON` | `$FLEET_HOME/recovery/fleet-roster.json` | Role workdirs and `claude --resume` flags |
+| `FLEET_RECOVERY_LOG` | `$FLEET_HOME/recovery/recover-last.txt` | Recovery script log |
+| `BOARD_CHECK_URL` | empty | Optional board health URL for `recover-fleet.sh` |
+| `RECOVERY_KEY` | `RECOVER-PLACEHOLDER` | Batch token substituted into message templates |
+
+Scripts under `scripts/steward/` and `scripts/recovery/` exit immediately if `FLEET_HOME` is unset.
+
+## 5. Behaviour switches
 
 | Variable | Default | Note |
 |---|---|---|
 | `ACTIVATOR_STALL_H` | `6` | How many hours a task may go without a terminal state before it counts as "stalled"; the watchdog alerts on it |
 
-## 5. Minimal runnable example
+## 6. Minimal runnable example
 
 ```bash
 export FLEET_HOME="$HOME/fleet-data"
@@ -84,7 +101,7 @@ export IM_APP_SECRET="..."
 python3 scripts/relay/im-send.py Owner "test message"
 ```
 
-## 6. How to confirm it is misconfigured
+## 7. How to confirm it is misconfigured
 
 Every configuration error prints **one plain sentence + how to fix it**, never a Python stack trace. The scripts emit these messages in Chinese; they are shown here in English. The common ones:
 

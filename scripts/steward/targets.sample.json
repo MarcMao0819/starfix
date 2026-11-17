@@ -1,0 +1,21 @@
+{
+  "_说明": "复制到 $FLEET_HOME/steward/targets.json 后改占位。未写 iterm_session 的目标每轮从 registry 的 last_restore 取窗口号。",
+  "registry": "$FLEET_HOME/fleet-sessions.json",
+  "snapshot_dir": "$CTX_SNAPSHOT_DIR/by-iterm",
+  "handoff_dir": "$FLEET_HANDOFF_DIR",
+  "data_dir": "$FLEET_HOME/steward/data",
+  "card_guide": "$FLEET_HOME/steward/交接卡写法.md",
+  "defaults": {
+    "threshold": { "percent": 85, "tokens": 400000 },
+    "idle_trigger": null
+  },
+  "targets": {
+    "captain": { "role": "主舰长" },
+    "crew-a": { "role": "舰员甲" },
+    "crew-b": {
+      "iterm_session": "替换为全大写窗口号",
+      "role": "舰员乙",
+      "threshold": { "percent": 85, "tokens": 200000 }
+    }
+  }
+}

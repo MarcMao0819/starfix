@@ -54,4 +54,4 @@ Rules for setting the line:
 
 Checklist for the hand-written part of the card (attached to the notice; no length limit): the current state; every piece of work in flight (who, which step, the criterion, the next step, the deadline); what the owner decided in this session (with the original words); what was tried and did not work; what was promised to others and what is awaited from them; what this session only just worked out; paths to evidence and receipts; how to re-attach timers and monitors; and whatever is still valid from the previous card, carried over.
 
-The reference implementation is not in this repository yet.
+The reference implementation lives under `scripts/steward/` (`steward2.py`, `run.sh`, `targets.sample.json`).

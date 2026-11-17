@@ -58,13 +58,30 @@ mkdir -p "$FLEET_HOME"
 export IM_APP_SECRET="$(cat ~/.secrets/im-app-secret)"   # 推荐
 ```
 
-## 四、行为开关
+## 四、上下文管家与舰队恢复
+
+| 变量 | 默认值 | 用在哪 |
+|---|---|---|
+| `CTX_SNAPSHOT_DIR` | `~/.claude/ctx-snapshot` | 水位快照目录；`steward2.py` 与恢复脚本读 `by-iterm/*.json` |
+| `STEWARD_TARGETS_JSON` | `$FLEET_HOME/steward/targets.json` | 管家配置（从 `scripts/steward/targets.sample.json` 复制后改） |
+| `STEWARD_DATA_DIR` | 配置文件里的 `data_dir` | 管家状态、日志、锁文件 |
+| `STEWARD_DIR` | 仓内 `scripts/steward` | `open-steward.py` 启动 `run.sh` 的位置 |
+| `FLEET_HANDOFF_DIR` | `$FLEET_HOME/handoff` | 交接卡 `HANDOFF-<session>.md` |
+| `FLEET_RECOVERY_TABLE` | `$FLEET_HOME/recovery/fleet-table.json` | 恢复后各角色窗口登记 |
+| `FLEET_ROSTER_JSON` | `$FLEET_HOME/recovery/fleet-roster.json` | 各角色工作目录与 `claude --resume` 参数 |
+| `FLEET_RECOVERY_LOG` | `$FLEET_HOME/recovery/recover-last.txt` | 恢复脚本日志 |
+| `BOARD_CHECK_URL` | 空 | 可选；`recover-fleet.sh` 探测看板是否在跑 |
+| `RECOVERY_KEY` | `RECOVER-PLACEHOLDER` | 写入消息模板里的批次占位 |
+
+以上脚本（`scripts/steward/*.py`、`scripts/recovery/*.py`、`recover-fleet.sh`）与管家 `run.sh` 一样：**未设 `FLEET_HOME` 立刻退出**。
+
+## 五、行为开关
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `ACTIVATOR_STALL_H` | `6` | 任务多少小时无终态算「停滞」，看门狗据此告警 |
 
-## 五、最小可跑示例
+## 六、最小可跑示例
 
 ```bash
 export FLEET_HOME="$HOME/fleet-data"
@@ -84,7 +101,7 @@ export IM_APP_SECRET="……"
 python3 scripts/relay/im-send.py Owner "测试消息"
 ```
 
-## 六、怎么确认配错了
+## 七、怎么确认配错了
 
 所有配置错误都会打印**一句人话 + 怎么修**，不会抛 Python 堆栈。常见几条：
 

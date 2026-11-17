@@ -632,7 +632,7 @@ test('panel answer preserves conditions and wakes the captain without a second q
   const service = new Services(f.fleet);
   const view = service.panelSnapshot();
   const answer = 'A, but first inspect the diagnostic report. Do not restart any process.';
-  const inboxFile = path.join(f.fleet.home, 'inbox', '4af7a78c-b837-4d2c-869b-4e1b2ac63c3e.json');
+  const inboxFile = path.join(f.fleet.home, 'inbox', `${crypto.randomUUID()}.json`);
   fs.writeFileSync(inboxFile, JSON.stringify({ captain: view.captain, qid: 'Q1', questionHash: view.decisions[0].questionHash, answer }));
   await service.applyInbox();
   await service.applyInbox();

@@ -1,0 +1,23 @@
+{
+  "_说明": "复制到 $FLEET_HOME/recovery/fleet-roster.json。workdir 与 resume_args 供原地续接/新开标签续接使用。",
+  "captain": {
+    "name": "主舰长",
+    "workdir": "$FLEET_HOME",
+    "resume_args": ["--permission-mode", "auto"]
+  },
+  "crew-a": {
+    "name": "舰员甲",
+    "workdir": "$FLEET_HOME/worktrees/示例工位",
+    "resume_args": ["--permission-mode", "auto"]
+  },
+  "relay": {
+    "name": "消息中转",
+    "workdir": "$FLEET_HOME",
+    "resume_args": ["--permission-mode", "auto"]
+  },
+  "secretary": {
+    "name": "书记",
+    "workdir": "$FLEET_HOME",
+    "resume_args": []
+  }
+}

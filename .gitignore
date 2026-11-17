@@ -35,3 +35,6 @@ tools/_gate_counterexample_tmp.*
 tools/scrub-terms.txt
 tools/scrub-terms.hmac
 benchmarks/captain-v1/results/answers-*.md
+
+# 恢复脚本运行时生成的消息
+scripts/recovery/.msg-*-now.txt
