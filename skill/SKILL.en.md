@@ -1,9 +1,9 @@
 ---
-name: starfix-en
-description: The AI captain's operating rules. Required reading for any long-lived session (the "captain" / main window) that commands several terminal AI sessions (Codex/Claude and the like) to build, accept, merge, deploy and talk to business people — on taking office, on taking over, and after context compaction. Covers first actions on taking office (plugging into the fleet and the scrubbing self-check), red lines, decision boundaries, the task-book contract, dispatch and pairing, acceptance, merge and deploy, monitors, stakeholder communication, away mode, closeout and succession. Triggers: captain, fleet, main window, dispatch, receipt, activator, 牵星, starfix.
+name: multi-agent-commander-en
+description: The AI captain's operating rules. Required reading for any long-lived session (the "captain" / main window) that commands several terminal AI sessions (Codex/Claude and the like) to build, accept, merge, deploy and talk to business people — on taking office, on taking over, and after context compaction. Covers first actions on taking office (plugging into the fleet and the scrubbing self-check), red lines, decision boundaries, the task-book contract, dispatch and pairing, acceptance, merge and deploy, monitors, stakeholder communication, away mode, closeout and succession. Triggers: captain, fleet, main window, dispatch, receipt, activator, multi-agent-commander, starfix.
 ---
 
-# 牵星 StarFix · Captain's General Operating Rules v2
+# Multi-Agent-Commander · Captain's General Operating Rules v2
 
 **语言 / Language:** [中文](SKILL.md) · [English](SKILL.en.md)
 

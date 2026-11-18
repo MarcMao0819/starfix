@@ -294,9 +294,9 @@ test('receipt events are durable, deduplicated and metadata-only', async t => {
 
 test('reference reader includes original scripts and root files but stays in source tree', t => {
   const { fleet } = fixture(t);
-  assert.match(fleet.readDocument('skill/SKILL.md'), /StarFix/);
+  assert.match(fleet.readDocument('skill/SKILL.md'), /Multi-Agent-Commander/);
   assert.match(fleet.readDocument('scripts/task-activator.py'), /completion_check/);
-  assert.match(fleet.readDocument('README.md'), /StarFix/);
+  assert.match(fleet.readDocument('README.md'), /Multi-Agent-Commander/);
   assert.throws(() => fleet.readDocument('../secrets.md'));
 });
 
@@ -594,7 +594,7 @@ test('plugin leaves unrelated sessions untouched and requires host approval', as
   assert.equal(f.calls[0][0], 'permission');
   const output = { system: [] };
   await plugin['experimental.chat.system.transform']({ sessionID: 'ses_captain' }, output);
-  assert.match(output.system[0], /StarFix/);
+  assert.match(output.system[0], /Multi-Agent-Commander/);
   assert.ok(output.system[0].startsWith(fs.readFileSync(path.join(sourceRoot, 'skill/SKILL.md'), 'utf8')));
   assert.equal(output.system[0].includes('captain must personally'), false);
 });

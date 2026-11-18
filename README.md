@@ -1,6 +1,6 @@
 <div align="center">
 
-# 牵星 · StarFix
+# Multi-Agent-Commander
 
 **一个 AI 当舰长，指挥一队终端里的 AI 把项目做完。**
 
@@ -25,7 +25,7 @@
 
 这套办法把一次次的调用，换成一个有分工、有记录的班子：
 
-| | AI 自己开子代理 | StarFix |
+| | AI 自己开子代理 | Multi-Agent-Commander |
 |---|---|---|
 | 干活的 | 短命的子任务，共用父会话的上下文 | 常驻的终端会话，各有各的上下文、工作区和额度 |
 | 模型 | 只能用父会话那一个 | 多家模型混编，一家写，另一家审 |
@@ -76,7 +76,7 @@
 
 通过线是综合分 90 以上、角色纪律 95 以上、其余各项 85 以上。三个模型目前都没有通过。前两个模型的分数做过一次模拟器误拒校准，原始分保留在记录里。
 
-[交互式结果页](https://marcmao0819.github.io/starfix/bench/) · [题库与评分方法](benchmarks/captain-v1/README.md) · [原始记录](benchmarks/captain-v1/results/records/)
+[交互式结果页](https://marcmao0819.github.io/Multi-Agent-Commander/bench/) · [题库与评分方法](benchmarks/captain-v1/README.md) · [原始记录](benchmarks/captain-v1/results/records/)
 
 ## 仓里有什么
 
@@ -124,5 +124,7 @@
 ## 作者与许可
 
 **三娃老爸**（GitHub [MarcMao0819](https://github.com/MarcMao0819)，小红书「三娃老爸」，号 294613559）。机制、规程和每一条判断，都是他在真实项目里定下来的；整理、脱敏、绘图和提交，由 AI 会话在他指挥下完成。有问题可以到小红书找他。
+
+本项目原名 StarFix（牵星）。
 
 以 MIT 许可发布，见 [LICENSE](LICENSE)。

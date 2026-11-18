@@ -1,13 +1,13 @@
 # 术语表 · Glossary
 
-牵星 StarFix 中英对照词表。翻译（中→英、英→中）一律以本表为准，一词一译，不得同义替换。
-Bilingual term list for StarFix. Every translation in this repository follows this table exactly — one term, one rendering, no synonyms.
+Multi-Agent-Commander 中英对照词表。翻译（中→英、英→中）一律以本表为准，一词一译，不得同义替换。
+Bilingual term list for Multi-Agent-Commander. Every translation in this repository follows this table exactly — one term, one rendering, no synonyms.
 
 ## 一、核心角色与机制 · Core roles and mechanisms
 
 | 中文 | English | 备注 / Note |
 |---|---|---|
-| 牵星 | 牵星 (StarFix) | 项目名保留中文，首次出现附 StarFix / project name stays in Chinese, followed by StarFix on first use |
+| Multi-Agent-Commander | Multi-Agent-Commander | 项目名，中英文同名，不翻译 / project name, the same in both languages |
 | 舰长 | captain | |
 | 主窗 / 主窗口 | main window | 舰长所在的那个常驻会话 / the captain's resident session |
 | 舰员 | crew member | 复数 crew members；集合名词用 crew |

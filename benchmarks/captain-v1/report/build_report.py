@@ -773,7 +773,7 @@ def render_html(primary, appendix, meta, sample_mode, masked_dates, sources):
 <html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>舰长 Benchmark · 评测结果</title>
-<meta name="description" content="StarFix 舰长 benchmark v{meta['version']} 困难版的模型评测结果。">
+<meta name="description" content="Multi-Agent-Commander 舰长 benchmark v{meta['version']} 困难版的模型评测结果。">
 <style>{CSS}</style>
 </head><body><div class="shell">
 <div class="mast"><div class="brand"><i>SF</i>STARFIX · 舰长 BENCHMARK</div>

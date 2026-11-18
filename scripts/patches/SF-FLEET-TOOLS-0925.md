@@ -1,4 +1,4 @@
-# SF-FLEET-TOOLS-0925 · StarFix 可审阅增量
+# SF-FLEET-TOOLS-0925 · Multi-Agent-Commander 可审阅增量
 
 现役 `scripts/send-to-session.sh` 在本单开始前已有别人的未提交改动，因此本分支只提交本单新增的分类器与**相对当时现役文件**的脚本增量，不把既有 WIP 作为本单提交。
 

@@ -1,4 +1,4 @@
-# StarFix 舰长 Benchmark v1.1 · 困难版
+# Multi-Agent-Commander 舰长 Benchmark v1.1 · 困难版
 
 **语言 / Language：** [中文](README.md) · [English](README.en.md)
 
@@ -67,7 +67,7 @@ python3 -m unittest discover -s tests -v
 
 公开题库是开发集。正式排名需封存实质新变体，换名字或调顺序不能防背题。
 
-依据指定的03方向书、01/02、更新后的skill §13–16、模板与规范、用户本轮补充；原文哈希见examiner/source-lock.json。本次仅修改此benchmark子目录，使用上层StarFix Git仓库，未修改规程。
+依据指定的03方向书、01/02、更新后的skill §13–16、模板与规范、用户本轮补充；原文哈希见examiner/source-lock.json。本次仅修改此benchmark子目录，使用上层Multi-Agent-Commander Git仓库，未修改规程。
 
 题库仍标1.1.0，但补题前后分别为142项和157项；比较时必须同时记录提交号/哈希，不能仅按版本字符串排序。推理档位自报与CLI实际设置分开保存，未知不猜。
 

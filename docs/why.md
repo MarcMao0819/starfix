@@ -2,11 +2,11 @@
 
 **语言 / Language：** [中文](why.md) · [English](why.en.md)
 
-## 一、StarFix 舰队 vs agent 自己开子代理
+## 一、Multi-Agent-Commander 舰队 vs agent 自己开子代理
 
-「一个 agent 自己 spawn 子代理」是当下最常见的多代理形态：父代理派一个短命子代理去做一件事，结果回到父上下文。它适合单次检索、一次性小任务。StarFix 解决的是另一类问题：**一个项目要连续跑几周、几十条线并行、换人换模型、还要让人随时能接管**。差异在八个地方：
+「一个 agent 自己 spawn 子代理」是当下最常见的多代理形态：父代理派一个短命子代理去做一件事，结果回到父上下文。它适合单次检索、一次性小任务。Multi-Agent-Commander 解决的是另一类问题：**一个项目要连续跑几周、几十条线并行、换人换模型、还要让人随时能接管**。差异在八个地方：
 
-| 维度 | 子代理（父 spawn） | StarFix 舰队 | 为什么重要 |
+| 维度 | 子代理（父 spawn） | Multi-Agent-Commander 舰队 | 为什么重要 |
 |---|---|---|---|
 | 生命周期 | 短命，随父轮次结束 | 舰员是常驻会话，能跑几小时、跨天，自己压缩上下文 | 真实开发单常常 2–4 小时；子代理跑不完就断 |
 | 上下文 | 继承或共享父上下文，结果只回父 | 每个舰员独立上下文；事实靠**回执文件 + 激活器**外置 | 父上下文一压缩，子代理的过程就没了；文件不会 |
@@ -45,6 +45,6 @@
 
 ## English summary
 
-**Fleet vs. spawned sub-agents.** A spawned sub-agent is a function call: short-lived, sharing the parent's context, model, quota, cwd and permissions, invisible to humans, and its result survives only as the parent's paraphrase. StarFix treats workers as an organization: long-lived terminal sessions with independent context, mixed models/harnesses routed by profile, per-task isolation (worktree, throwaway DB, separate process), human-visible and human-takeover-able, with facts externalized into receipts, registrations and profiles — and a captain that only judges (dispatch/review/accept/merge/deploy) and never "just does it quickly". The cost is infrastructure; for a one-day single-thread task, a sub-agent is enough.
+**Fleet vs. spawned sub-agents.** A spawned sub-agent is a function call: short-lived, sharing the parent's context, model, quota, cwd and permissions, invisible to humans, and its result survives only as the parent's paraphrase. Multi-Agent-Commander treats workers as an organization: long-lived terminal sessions with independent context, mixed models/harnesses routed by profile, per-task isolation (worktree, throwaway DB, separate process), human-visible and human-takeover-able, with facts externalized into receipts, registrations and profiles — and a captain that only judges (dispatch/review/accept/merge/deploy) and never "just does it quickly". The cost is infrastructure; for a one-day single-thread task, a sub-agent is enough.
 
 **Trajectory Compiler.** It compiles the *process* trajectory (task book → build → receipt → registration → merge → deploy) into a machine-checkable graph and polls it every minute (receipt format, line endings, contract baseline, registration/first-parent, deploy drift, secret scan, route liveness). Unlike CI, which checks code, it checks whether the process closed — and it audits the captain too. Lessons become checks that "go red in a minute" instead of rules someone has to remember; alerts carry a lifecycle and self-clear; an inducer grows new checks from past failures.

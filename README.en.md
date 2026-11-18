@@ -1,6 +1,6 @@
 <div align="center">
 
-# StarFix
+# Multi-Agent-Commander
 
 **One AI acts as captain and runs a crew of terminal AI agents until the project is done.**
 
@@ -25,7 +25,7 @@ Letting one AI spawn its own sub-agents works for tasks that take minutes. A pro
 
 This project replaces a series of calls with a team that has roles and records:
 
-| | An AI spawning sub-agents | StarFix |
+| | An AI spawning sub-agents | Multi-Agent-Commander |
 |---|---|---|
 | Who does the work | Short-lived sub-tasks sharing the parent's context | Long-lived terminal sessions, each with its own context, worktree and quota |
 | Models | Only the parent's | Mixed vendors: one writes, another reviews |
@@ -76,7 +76,7 @@ Whether a model can serve as captain can be tested. The repository includes an e
 
 Passing requires an overall score of at least 90, role discipline of at least 95, and at least 85 on every other ability. None of the three models passes yet. The scores of the first two were recalibrated once for a simulator false rejection; the raw scores are kept in the records.
 
-[Interactive results](https://marcmao0819.github.io/starfix/bench/) · [Question bank and scoring](benchmarks/captain-v1/README.md) · [Raw records](benchmarks/captain-v1/results/records/)
+[Interactive results](https://marcmao0819.github.io/Multi-Agent-Commander/bench/) · [Question bank and scoring](benchmarks/captain-v1/README.md) · [Raw records](benchmarks/captain-v1/results/records/)
 
 ## What is in the repository
 
@@ -124,5 +124,7 @@ Run `tools/scrub-gate.sh` before you commit. It blocks personal names, addresses
 ## Author and licence
 
 **三娃老爸** (GitHub [MarcMao0819](https://github.com/MarcMao0819); Xiaohongshu "三娃老爸", ID 294613559). The mechanism, the rules and every ruling behind them were set by him on a real project. Organising, scrubbing, drawing and committing were done by AI sessions under his command. Questions are welcome on Xiaohongshu.
+
+This project was formerly named StarFix.
 
 Released under the MIT licence; see [LICENSE](LICENSE).

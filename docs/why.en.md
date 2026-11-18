@@ -2,11 +2,11 @@
 
 **语言 / Language:** [中文](why.md) · [English](why.en.md)
 
-## 1. The StarFix fleet vs. an agent spawning its own sub-agents
+## 1. The Multi-Agent-Commander fleet vs. an agent spawning its own sub-agents
 
-"An agent spawns its own sub-agent" is the most common multi-agent shape today: a parent agent sends a short-lived sub-agent to do one thing, and the result comes back into the parent's context. It suits a one-off lookup or a one-off small task. StarFix solves a different class of problem: **a project that has to run for weeks, with dozens of parallel lines, swapping people and models, and a human able to take over at any moment**. The differences are in eight places:
+"An agent spawns its own sub-agent" is the most common multi-agent shape today: a parent agent sends a short-lived sub-agent to do one thing, and the result comes back into the parent's context. It suits a one-off lookup or a one-off small task. Multi-Agent-Commander solves a different class of problem: **a project that has to run for weeks, with dozens of parallel lines, swapping people and models, and a human able to take over at any moment**. The differences are in eight places:
 
-| Dimension | Sub-agent (spawned by the parent) | StarFix fleet | Why it matters |
+| Dimension | Sub-agent (spawned by the parent) | Multi-Agent-Commander fleet | Why it matters |
 |---|---|---|---|
 | Lifetime | Short-lived; ends with the parent's turn | Crew are resident sessions that run for hours or across days and compact their own context | Real development tasks often take 2–4 hours; a sub-agent dies before it finishes |
 | Context | Inherits or shares the parent's context; the result only returns to the parent | Each crew member has independent context; facts are externalised into **receipt files + the activator** | Once the parent's context compacts, the sub-agent's process is gone; files are not |

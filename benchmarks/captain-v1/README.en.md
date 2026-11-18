@@ -1,4 +1,4 @@
-# StarFix Captain Benchmark v1.1 · Hard Edition
+# Multi-Agent-Commander Captain Benchmark v1.1 · Hard Edition
 
 **语言 / Language:** [中文](README.md) · [English](README.en.md)
 
@@ -65,6 +65,6 @@ The examiner still has to arrange candidate model / harness onboarding, simulate
 
 The public question bank is a development set. An official ranking requires substantively new variants kept sealed; renaming or reordering does not stop question memorisation.
 
-Based on the designated 03 direction paper, 01/02, the updated skill §13–16, the templates and specs, and the user's additions this round; source hashes in examiner/source-lock.json. This round modified only this benchmark subdirectory, used the parent StarFix Git repository, and did not modify the operating rules.
+Based on the designated 03 direction paper, 01/02, the updated skill §13–16, the templates and specs, and the user's additions this round; source hashes in examiner/source-lock.json. This round modified only this benchmark subdirectory, used the parent Multi-Agent-Commander Git repository, and did not modify the operating rules.
 
 Use run_l1_exam.py for headless L1 with an empty native tool list. The unchanged 1.1.0 version label covers both the historical 142-check and new 157-check banks: record the source commit/hash. Reported reasoning depth and configured effort are separate metadata; do not infer unknown settings.
