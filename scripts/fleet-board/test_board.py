@@ -53,7 +53,7 @@ class BoardData(unittest.TestCase):
         self.assertEqual(data['captain']['watermark'], 28)
         self.assertEqual(data['captain']['awaiting_ids'], ['T-B1', 'T-B2', 'T-B3'])
         self.assertEqual(data['captain']['pending_questions'], 3)
-        self.assertEqual(data['captain']['pending_task_ids'], ['T-C1', 'T-B3'])
+        self.assertEqual(data['captain']['pending_question_ids'], ['Q-C', 'Q-A', 'Q-B'])
         self.assertNotIn('task_title', data['captain'])
         self.assertNotIn('others', data['captain'])
         self.assertEqual([person['role'] for person in data['crew']], ['舰员甲', '舰员乙', '舰员丙'])

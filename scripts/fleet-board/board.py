@@ -550,21 +550,13 @@ def person_from(role, primary, others, marks, pending_questions=None):
 def build_captain(views, questions, marks):
     """舰长卡只留两笔数和单号，不把舰员的明细再抄一遍。"""
     awaiting = sorted(item['id'] for item in views if item['status'] == '已交回执待验收')
-    pending_ids = []
-    pending_count = 0
-    for row in questions:
-        if not row['unanswered']:
-            continue
-        pending_count += 1
-        for tid in row['tasks']:
-            if tid not in pending_ids:
-                pending_ids.append(tid)
+    pending_ids = [row['qid'] for row in questions if row['unanswered']]
     return {
         'role': '舰长',
         'watermark': (marks or {}).get('舰长'),
         'awaiting_ids': awaiting,
-        'pending_questions': pending_count,
-        'pending_task_ids': pending_ids,
+        'pending_questions': len(pending_ids),
+        'pending_question_ids': pending_ids,
     }
 
 

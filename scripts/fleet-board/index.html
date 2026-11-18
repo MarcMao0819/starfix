@@ -418,7 +418,7 @@
     card.appendChild(el('div', {class: 'title'}, tr('待验收') + ' ' + awaiting.length));
     if (awaiting.length) card.appendChild(el('div', {class: 'meta'}, taskList(awaiting)));
     card.appendChild(el('div', {class: 'title'}, tr('等负责人定的问题') + ' ' + (person.pending_questions || 0)));
-    var asked = person.pending_task_ids || [];
+    var asked = person.pending_question_ids || [];
     if (asked.length) card.appendChild(el('div', {class: 'meta'}, taskList(asked)));
     return card;
   }
