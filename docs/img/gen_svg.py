@@ -8,6 +8,12 @@ if '--lang' in sys.argv:
     LANG=sys.argv[sys.argv.index('--lang')+1]
 if LANG not in ('zh','en'):
     sys.exit(f'unknown --lang {LANG}（只支持 zh / en）')
+# 配色：默认 --theme light；--theme dark 输出到同级 dark/ 目录，给深色页面用。
+THEME='light'
+if '--theme' in sys.argv:
+    THEME=sys.argv[sys.argv.index('--theme')+1]
+if THEME not in ('light','dark'):
+    sys.exit(f'unknown --theme {THEME}（只支持 light / dark）')
 
 # 英文文案内嵌在这里；键=中文原文，值=英文。缺键则原样输出。
 TR={
@@ -96,7 +102,9 @@ TR={
 def T(x):
     if LANG=='zh' or x is None: return x
     return TR.get(x,x)
-C={'ink':'#1B1F27','sub':'#6B7280','line':'#9AA3B2','acc':'#2563EB','accbg':'#EAF1FF','lane':'#F3F5F9','bg':'#FFFFFF','ok':'#059669','warn':'#D97706'}
+C={'ink':'#1B1F27','sub':'#6B7280','line':'#9AA3B2','acc':'#2563EB','accbg':'#EAF1FF','lane':'#F3F5F9','bg':'#FFFFFF','ok':'#059669','warn':'#D97706','canvas':'#FFFFFF','stroke':'#E3E7EE'}
+if THEME=='dark':
+    C={'ink':'#E6EDF3','sub':'#9198A1','line':'#6E7681','acc':'#4493F8','accbg':'#12233D','lane':'#161B22','bg':'#21262D','ok':'#3FB950','warn':'#D29922','canvas':'#0D1117','stroke':'#30363D'}
 class G:
     def __init__(s,h,title,sub=None):
         s.h=h; s.o=[]; s.title=T(title); s.sub=T(sub)
@@ -105,7 +113,7 @@ class G:
         s.o.append(f'<text x="34" y="{y+22}" font-size="12" font-weight="700" fill="{C["sub"]}" letter-spacing="1">{E(T(label))}</text>')
     def card(s,x,y,w,h,title,sub=None,n=None,accent=False,color=None):
         col=color or C['acc']
-        s.o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{C["bg"]}" stroke="{col if accent else "#E3E7EE"}" stroke-width="{1.5 if accent else 1}" filter="url(#sh)"/>')
+        s.o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{C["bg"]}" stroke="{col if accent else C["stroke"]}" stroke-width="{1.5 if accent else 1}" filter="url(#sh)"/>')
         s.o.append(f'<rect x="{x}" y="{y+10}" width="4" height="{h-20}" rx="2" fill="{col}"/>')
         tx=x+18
         if n is not None:
@@ -126,10 +134,13 @@ class G:
         if LANG!='zh':
             p=os.path.join(os.path.dirname(p),LANG,os.path.basename(p))
             os.makedirs(os.path.dirname(p),exist_ok=True)
+        if THEME=='dark':
+            p=os.path.join(os.path.dirname(p),'dark',os.path.basename(p))
+            os.makedirs(os.path.dirname(p),exist_ok=True)
         head=(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {s.h}" width="{W}" height="{s.h}" font-family="-apple-system,BlinkMacSystemFont,\'PingFang SC\',\'Hiragino Sans GB\',\'Noto Sans CJK SC\',\'Helvetica Neue\',Arial,sans-serif">'
               '<defs><filter id="sh" x="-5%" y="-5%" width="110%" height="120%"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0F172A" flood-opacity="0.08"/></filter>'
               f'<marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="{C["line"]}"/></marker></defs>'
-              f'<rect width="{W}" height="{s.h}" fill="#FFFFFF"/><text x="24" y="30" font-size="17" font-weight="700" fill="{C["ink"]}">{E(s.title)}</text>')
+              f'<rect width="{W}" height="{s.h}" fill="{C["canvas"]}"/><text x="24" y="30" font-size="17" font-weight="700" fill="{C["ink"]}">{E(s.title)}</text>')
         if s.sub: head+=f'<text x="24" y="50" font-size="12" fill="{C["sub"]}">{E(s.sub)}</text>'
         open(p,'w',encoding='utf-8').write(head+''.join(s.o)+'</svg>')
 
@@ -205,4 +216,83 @@ g.arr([(330,108),(380,108)]); g.arr([(650,108),(700,108)]); g.arr([(835,136),(83
 g.arr([(330,214),(380,214)]); g.arr([(650,214),(700,214)]); g.arr([(515,242),(515,292)]); g.arr([(195,242),(195,292)]); g.arr([(835,242),(835,292)]); g.arr([(835,348),(835,370),(60,370),(60,108)],dash=True)
 g.note(410,'p1 提交哈希存在 · p2 三方文件数 · p3 文件清单 DB=git · p4 标题乱码 · p5 行尾双规则 · p6 部署漂移 · p7 路由存活')
 g.save('docs/img/06-trajectory.svg')
-print('svg x6')
+# 首页总览图：不带「图 N」标题，宽 1200；负责人 ⇄ 舰长 ⇄ 舰员，底下一条「每一步都落成文件」
+TR.update({
+ '你（负责人）':'You (the Owner)', '只答选择题':'answer multiple-choice only',
+ '只有三类事会来问你':'Only three things escalate to you',
+ '· 不可逆的上线操作':'· irreversible production changes',
+ '· 只有人知道的业务事实':'· facts only a human knows',
+ '· 对外发布':'· anything published externally',
+ '选择题＋推荐':'A/B/C question', '一键答复':'one-click answer',
+ '一个长期在线的 AI 会话':'one long-running AI session',
+ '写任务书，派给合适的舰员':'task books and dispatch',
+ '验收实物，安排交叉复审':'acceptance on artifacts, cross-review',
+ '合并、上线、写交接':'merge, deploy, handoff',
+ '只做判断，不写业务代码':'judges only — writes no product code',
+ '任务书':'task book', '回执':'receipt',
+ '舰员 · 终端里的 AI 会话':'CREW · AI in terminals',
+ '舰员甲':'Crew A', '舰员乙':'Crew B', '舰员丙':'Crew C',
+ '模型 A · 独立工作区':'model A · own worktree', '模型 B · 独立工作区':'model B · own worktree', '模型 C · 独立工作区':'model C · own worktree',
+ '多家模型混编，互相复审':'mixed vendors, cross-reviewing',
+ '每一步都落成文件':'EVERY STEP LANDS AS A FILE',
+ '变更登记':'registration', '合并门禁':'merge gates', '上线记录':'deploy record',
+ '换掉任何一个会话（包括舰长），':'Swap out any session, the captain',
+ '项目照样接得上。':'included, and the project carries on.',
+})
+def hero(path):
+    HW,HH=1200,494; o=[]
+    def t(x,y,s,size=14,weight=400,fill=None,anchor='start',ls=None):
+        a=f' letter-spacing="{ls}"' if ls else ''
+        o.append(f'<text x="{x}" y="{y}" font-size="{size}" font-weight="{weight}" fill="{fill or C["ink"]}" text-anchor="{anchor}"{a}>{E(T(s))}</text>')
+    def box(x,y,w,h,fill,stroke,sw=1,rx=12,shadow=True):
+        f=' filter="url(#sh)"' if shadow else ''
+        o.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{f}/>')
+    def arrow(x1,x2,y,label,above):
+        o.append(f'<path d="M{x1},{y} L{x2},{y}" fill="none" stroke="{C["line"]}" stroke-width="1.8" marker-end="url(#m)"/>')
+        t((x1+x2)/2, y-10 if above else y+22, label, 13.5, 600, C['acc'], 'middle')
+    # 负责人
+    box(32,40,264,92,C['bg'],C['stroke'])
+    o.append(f'<rect x="32" y="54" width="4" height="64" rx="2" fill="{C["ok"]}"/>')
+    t(56,80,'你（负责人）',19,700); t(56,108,'只答选择题',14.5,400,C['sub'])
+    t(36,172,'只有三类事会来问你',13,700,C['sub'])
+    for i,x in enumerate(['· 不可逆的上线操作','· 只有人知道的业务事实','· 对外发布']): t(36,200+i*26,x,14,400,C['sub'])
+    # 舰长
+    box(424,40,384,280,C['bg'],C['acc'],2,14)
+    o.append(f'<text x="452" y="92" font-size="30" font-weight="700" fill="{C["ink"]}">{"舰长" if LANG=="zh" else "Captain"}</text>')
+    t(452,118,'一个长期在线的 AI 会话',14.5,400,C['sub'])
+    o.append(f'<path d="M452,136 L780,136" stroke="{C["stroke"]}" stroke-width="1"/>')
+    for i,x in enumerate(['写任务书，派给合适的舰员','验收实物，安排交叉复审','合并、上线、写交接']):
+        o.append(f'<circle cx="457" cy="{161+i*32}" r="3.5" fill="{C["acc"]}"/>'); t(472,167+i*32,x,16.5,500)
+    o.append(f'<rect x="452" y="256" width="328" height="38" rx="19" fill="{C["accbg"]}"/>')
+    t(616,281,'只做判断，不写业务代码',14.5,700,C['acc'],'middle')
+    # 舰员
+    o.append(f'<rect x="936" y="40" width="232" height="280" rx="14" fill="{C["lane"]}" stroke="{C["stroke"]}" stroke-width="1"/>')
+    t(952,66,'舰员 · 终端里的 AI 会话',12.5,700,C['sub'],ls=0.5)
+    for i,(a,b) in enumerate([('舰员甲','模型 A · 独立工作区'),('舰员乙','模型 B · 独立工作区'),('舰员丙','模型 C · 独立工作区')]):
+        y=80+i*66; box(950,y,204,58,C['bg'],C['stroke'],1,10)
+        o.append(f'<rect x="950" y="{y+11}" width="4" height="36" rx="2" fill="{C["acc"]}"/>')
+        t(968,y+25,a,16,600); t(968,y+45,b,13,400,C['sub'])
+    t(1052,302,'多家模型混编，互相复审',13,400,C['sub'],'middle')
+    # 往返
+    arrow(424,304,68,'选择题＋推荐',True); arrow(296,416,104,'一键答复',False)
+    arrow(808,928,160,'任务书',True); arrow(936,816,204,'回执',False)
+    # 落文件
+    o.append(f'<rect x="32" y="352" width="1136" height="110" rx="14" fill="{C["lane"]}" stroke="{C["stroke"]}" stroke-width="1"/>')
+    t(52,380,'每一步都落成文件',12.5,700,C['sub'],ls=0.5)
+    chips=['任务书','回执','变更登记','合并门禁','上线记录']
+    for i,x in enumerate(chips):
+        cx=52+i*156; box(cx,396,132,40,C['bg'],C['stroke'],1,20,False); t(cx+66,421,x,14.5,600,None,'middle')
+        if i<len(chips)-1: o.append(f'<path d="M{cx+136},416 L{cx+152},416" fill="none" stroke="{C["line"]}" stroke-width="1.8" marker-end="url(#m)"/>')
+    t(852,411,'换掉任何一个会话（包括舰长），',14.5,500); t(852,435,'项目照样接得上。',14.5,500)
+    if LANG!='zh':
+        path=os.path.join(os.path.dirname(path),LANG,os.path.basename(path))
+    if THEME=='dark':
+        path=os.path.join(os.path.dirname(path),'dark',os.path.basename(path))
+    os.makedirs(os.path.dirname(path),exist_ok=True)
+    head=(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {HW} {HH}" width="{HW}" height="{HH}" font-family="-apple-system,BlinkMacSystemFont,\'PingFang SC\',\'Hiragino Sans GB\',\'Noto Sans CJK SC\',\'Helvetica Neue\',Arial,sans-serif">'
+          '<defs><filter id="sh" x="-5%" y="-5%" width="110%" height="120%"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#0F172A" flood-opacity="0.08"/></filter>'
+          f'<marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="{C["line"]}"/></marker></defs>'
+          f'<rect x="0.5" y="0.5" width="{HW-1}" height="{HH-1}" rx="16" fill="{C["canvas"]}" stroke="{C["stroke"]}"/>')
+    open(path,'w',encoding='utf-8').write(head+''.join(o)+'</svg>')
+hero('docs/img/hero.svg')
+print('svg x7')

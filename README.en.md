@@ -1,80 +1,128 @@
-# 牵星 · StarFix
+<div align="center">
 
-**语言 / Language:** [中文](README.md) · [English](README.en.md)
+# StarFix
 
-> Zheng He's fleet fixed its position by the stars; an AI fleet fixes its position by facts.
+**One AI acts as captain and runs a crew of terminal AI agents until the project is done.**
 
-**One long-lived AI session (the captain) runs a fleet of terminal AI workers: dispatch, acceptance, merge, deploy, stakeholder relay, away-mode handover — and turns its judgement into rules you can assess.** Not a framework: a playbook that ran a real project for weeks, plus the scripts that hold it up.
+Dispatch, acceptance, merge, deploy, handoff: every step lands as a file. It runs for weeks, and any session can be replaced without losing the thread.
 
-## Run it in 5 minutes
+[中文](README.md) · [English](README.en.md) · [How it works](docs/mechanism.en.md) · [Benchmark](#benchmark) · [Operating rules](skill/SKILL.en.md)
 
-tmux + python3 only:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/dark/hero.svg">
+  <img src="docs/img/en/hero.svg" alt="The Owner answers multiple-choice questions; the captain writes task books, accepts work, merges and deploys; crew members build in their own worktrees; every step lands as a file" width="100%">
+</picture>
 
-```bash
-export FLEET_HOME=/tmp/fleet
-bash quickstart/demo.sh
-```
+</div>
 
-A 15-step loop: dispatch → deliver → build → receipt → accept → ask → answer → unlock. Tutorial: [quickstart/README.en.md](quickstart/README.en.md).
+## The problem
 
-## What it looks like
+Letting one AI spawn its own sub-agents works for tasks that take minutes. A project that runs for weeks, on several lines at once, across more than one model, runs into three problems:
 
-![Task lifecycle](docs/img/en/02-task-lifecycle.svg)
+- **It does not last.** A sub-agent ends with its parent's turn, so it cannot carry a two-to-three-hour development task. Once the parent's context is compacted, the process is gone.
+- **Nobody checks the work.** The same model writes and reviews. Conclusions survive only as a paraphrase, with no artifact to go back to.
+- **A human cannot take over.** You cannot see what it is doing, and you cannot step in when it goes wrong.
 
-![Decision loop](docs/img/en/03-decision-loop.svg)
+This project replaces a series of calls with a team that has roles and records:
 
-The full mechanism (roles, senses, context handoff, trajectory compiler, a real day) is in [docs/mechanism.en.md](docs/mechanism.en.md).
+| | An AI spawning sub-agents | StarFix |
+|---|---|---|
+| Who does the work | Short-lived sub-tasks sharing the parent's context | Long-lived terminal sessions, each with its own context, worktree and quota |
+| Models | Only the parent's | Mixed vendors: one writes, another reviews |
+| Where the facts live | The parent's paraphrase | Task books, receipts and registrations, all files |
+| Human takeover | Invisible | Every crew member is a terminal window you can watch and interrupt |
+| Who manages | Whoever is also doing the work | The captain only judges and writes no product code |
 
-## Captain Benchmark · three models measured
+The cost should be stated too. This needs infrastructure: terminal automation, monitors and a task activator. Getting started costs an order of magnitude more than spawning one sub-agent. For a single-line project that takes less than a day on one model, sub-agents are enough. The full comparison is in [docs/why.en.md](docs/why.en.md).
 
-Same question bank (captain-v1, 157 checkpoints), same examiner, all four layers:
+## Four terms
 
-| Model | Platform | Overall | K1 – K9 | Verdict |
-|---|---|---:|---|---|
-| GPT-6 Astra | Codex CLI 0.153.4 · 原生隔离会话 | **85.6** | 88 / 81 / 96 / 100 / 57 / 83 / 83 / 87 / 97 | not passed (veto: none) |
-| grok-4.6 | Grok CLI 1.0.25 · headless | **82.2** | 82 / 60 / 96 / 92 / 62 / 75 / 100 / 91 / 97 | not passed (veto: none) |
-| DeepSeek V4.1 Flash | Grok CLI 1.0.25 / provider: deepseek-flash | **76.2** | 74 / 62 / 79 / 88 / 55 / 100 / 75 / 91 / 78 | not passed (veto: none) |
+- **Captain**: one long-running AI session. It only judges: it writes task books, dispatches, accepts work, merges, deploys and talks to stakeholders.
+- **Crew member**: another AI session in a terminal, possibly a model from a different vendor. Each task is built in its own worktree and ends with a receipt.
+- **Receipt**: the file a crew member hands back, stating PASS, FAIL or BLOCKED, with evidence. The captain checks the artifact (the commit, the data, the run result), not what the receipt says.
+- **Owner**: the person who owns the project. Only three kinds of matter escalate to the Owner: irreversible production changes, facts only a human knows, and anything published externally. Each arrives as a multiple-choice question with a recommended option, and one click unblocks the tasks behind it.
 
-![Nine abilities](docs/img/bench/bench-abilities.svg)
+Every term used in this repository is listed in [docs/glossary.md](docs/glossary.md).
 
-![Overall and layers](docs/img/bench/bench-overall.svg)
+## How one task gets done
 
-The overall score is not the only number: nine abilities are scored separately (K1 role discipline 20%, K2 crew profiling & dispatch 15%, K3 recovery without native monitors 10%, K4 task-book quality 10%, K5 long-run & handover 10%, K6–K9 see the bank). Hard-mode thresholds are overall ≥90, K1 ≥95, others ≥85 — none of the three passes yet. Grok 4.6 and GPT-6 Astra are the S04 simulator-false-rejection calibrated versions (raw scores kept). Full interactive results page (leaderboard, radar, per-model review cards, lost-point details): **https://marcmao0819.github.io/starfix/bench/** (source `benchmarks/captain-v1/report/`, regenerated with one command). Raw records, review summaries and calibration notes: [`benchmarks/captain-v1/results/records/`](benchmarks/captain-v1/results/records/); method: [`benchmarks/captain-v1/README.en.md`](benchmarks/captain-v1/README.en.md).
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/dark/02-task-lifecycle.svg">
+  <img src="docs/img/en/02-task-lifecycle.svg" alt="Ten steps of one task: write the task book, deliver, build, hand back a receipt, spot-check and cross-review, merge through the gates, deploy" width="100%">
+</picture>
 
-## Where to read
+The captain writes a task book and delivers it to a crew member's terminal. The crew member builds in an isolated worktree, registers the change and hands back a receipt. A monitor sees the receipt and wakes the captain. The captain spot-checks the artifact, sends it to another model for cross-review, and merges and deploys only after it passes the gates. The files each step leaves behind, and the scripts involved, are in [docs/mechanism.en.md](docs/mechanism.en.md).
 
-| You want to know | Go to |
+## Trajectory Compiler: let a machine re-check the process
+
+A receipt that was never registered, a registration that was never merged, a merge that was never deployed: none of these is a code error, yet they are what a crew of AI agents gets wrong most often. The Trajectory Compiler turns the steps a human takes to audit one task into a graph. Stable verdict points are decided by scripts, and only the uncertain branches go to a model.
+
+| Process audit per task | Before compiling | After compiling |
+|---|---|---|
+| Model cost | about 12,000 tokens | 0 calls |
+| Time | minutes | 0.6 seconds |
+
+These figures were measured for routine tasks on one real audit workflow. Across 48 runs, no wrong verdict went unreported. Exception branches still go back to the model. How it works, and what it costs, is in [docs/trajectory.en.md](docs/trajectory.en.md).
+
+## Benchmark
+
+Whether a model can serve as captain can be tested. The repository includes an exam, captain-v1: 157 checkpoints in four layers (judgment questions, sandbox operation, continuous watch, taking over a handoff), with nine abilities scored separately.
+
+| Model | Environment | Overall | Result |
+|---|---|---:|---|
+| GPT-6 Astra | Codex CLI 0.153.4 | 85.6 | not passed |
+| grok-4.6 | Grok CLI 1.0.25 | 82.2 | not passed |
+| DeepSeek V4.1 Flash | Grok CLI 1.0.25 | 76.2 | not passed |
+
+Passing requires an overall score of at least 90, role discipline of at least 95, and at least 85 on every other ability. None of the three models passes yet. The scores of the first two were recalibrated once for a simulator false rejection; the raw scores are kept in the records.
+
+[Interactive results](https://marcmao0819.github.io/starfix/bench/) · [Question bank and scoring](benchmarks/captain-v1/README.md) · [Raw records](benchmarks/captain-v1/results/records/)
+
+## What is in the repository
+
+| Directory | Contents |
 |---|---|
-| Why the captain may decide on its own; the three things that must be escalated | [doctrine/00 — the captain's soul](doctrine/00-README.en.md) |
-| First actions on taking office; the full rules | [skill/SKILL.en.md](skill/SKILL.en.md) |
-| Why a fleet beats spawned sub-agents; how many tokens the trajectory compiler saves | [docs/why.en.md](docs/why.en.md) |
-| Monitors / terminal delivery / task activator / away mode / memory / context handoff | [specs/](specs/) |
-| How judgement goes wrong and how tools lie | [doctrine/02 case files](doctrine/02-试错战例集.en.md) · [doctrine/04 pitfalls](doctrine/04-踩坑指南.en.md) |
-| How to assess a captain | [doctrine/03](doctrine/03-舰长考核与benchmark方向.en.md) · [benchmarks/captain-v1](benchmarks/captain-v1/README.en.md) |
-| The machine auditing the process | [docs/trajectory.en.md](docs/trajectory.en.md) · [trajectory/](trajectory/) |
-| Scripts and environment variables | [scripts/README-env.en.md](scripts/README-env.en.md) |
-| Glossary (zh ↔ en) | [docs/glossary.md](docs/glossary.md) |
+| [skill/](skill/SKILL.en.md) | The captain's operating rules: first actions on taking office, red lines, decision boundaries, task books, dispatch, acceptance, merge and deploy, away mode, handoff |
+| [doctrine/](doctrine/00-README.en.md) | Command doctrine, case files, pitfalls, and how a captain is assessed |
+| [specs/](specs/) | Specifications for each mechanism: monitors, terminal delivery, task activator, away mode, memory, context handoff, fleet recovery |
+| [scripts/](scripts/README-env.en.md) | Supporting scripts: task activator, terminal delivery, sentinels and watchdogs, ask panel, message relay, context steward, fleet recovery |
+| [templates/](templates/) | Templates for task books, receipts, handoff cards, crew profiles and stakeholder profiles |
+| [trajectory/](trajectory/) | The Trajectory Compiler's inducer, runner and contract |
+| [benchmarks/](benchmarks/captain-v1/README.md) | The captain exam: question bank, scoring method and the records of three models |
+| [adapters/](adapters/) | Adapters for other terminal AI tools; opencode so far |
+| [docs/](docs/mechanism.en.md) | How it works, design trade-offs, and the bilingual glossary |
 
-## Who it is for
+## Getting it running
 
-- **Forward Deployed Engineers**: one person driving many parallel workstreams on a customer site with an AI fleet — dispatching, accepting, relaying to customer roles, getting decisions to the customer's boss, leaving an auditable trail, handing over at any time.
-- Independent developers and small-team tech leads who want several AI sessions to cooperate for a long time without losing control.
+This is not a framework you install and run. It is a set of operating rules with supporting scripts that you connect to the terminal AI tools you already use.
+
+1. Give [skill/SKILL.en.md](skill/SKILL.en.md) to the session that will be captain. Section 1 lists the first actions on taking office; done in order, they take about ten minutes.
+2. Set the environment variables described in [scripts/README-env.en.md](scripts/README-env.en.md). `FLEET_HOME` is required and has no default.
+3. Run `scripts/terminal-probe.sh` to see which delivery channels your terminal supports, then read [specs/delivery-terminal.en.md](specs/delivery-terminal.en.md). iTerm2 has a reference implementation; other terminals follow the specification.
+4. Start with one task: write a task book from [templates/01-任务书.en.md](templates/01-任务书.en.md), dispatch it to one crew member, wait for the receipt, and check the artifact.
 
 ## Six principles
 
-1. The captain judges, never writes business code; crew failure is normal, captain self-inflicted incidents are the real failures.
-2. A receipt is not a fact, the artifact is; every criterion must answer "under what condition would it go red".
-3. Stop and ask the Owner only for irreversible production actions, business facts only a human knows, and outward publication.
-4. Every pending question goes on the decision panel; an answer unlocks tasks.
-5. Monitors report only the dangerous side and only transitions, and never poll.
-6. Lessons become case files and gates the same day; overnight they are lost.
+1. The captain only judges and writes no product code. A crew member failing is normal; the captain's own mistake is the incident.
+2. A receipt is not a fact; the artifact is. Every criterion must be able to answer "when would this fail?".
+3. Stop and ask the Owner in three cases only: irreversible production changes, facts only a human knows, and anything published externally.
+4. Every question waiting on a person goes into the decision panel, and an answer unblocks the task.
+5. Monitors report only the dangerous side and only state transitions. They do not poll.
+6. A lesson becomes a case file and a gate the same day. Left overnight, it is lost.
 
-## Before sharing
+## Who it is for
 
-`tools/scrub-gate.sh` must pass (the term list and salt live outside the repo; without them the gate degrades to structural checks only).
+- **Forward-deployed engineers.** One person running a crew of AI agents on several lines at a customer's site, who has to dispatch, accept work, talk to each role, put decisions in front of the customer's Owner, leave a record that can be checked, and hand off at any time.
+- **Independent developers and technical leads of small teams** who want several AI sessions to work together for a long time without losing control.
 
-## Author
+A single-line task that finishes within a day does not need it.
 
-**三娃老爸** (GitHub MarcMao0819; Xiaohongshu "三娃老爸", ID 294613559). The mechanism, the rules and every ruling behind them were set by him on a real project; the captain (a Claude session) executes under his command — porting, scrubbing, drawing, committing. Questions welcome; a follow is appreciated.
+## Contributing
 
-MIT — see [LICENSE](LICENSE).
+Run `tools/scrub-gate.sh` before you commit. It blocks personal names, addresses, identifiers and similar content that does not belong in a public repository.
+
+## Author and licence
+
+**三娃老爸** (GitHub [MarcMao0819](https://github.com/MarcMao0819); Xiaohongshu "三娃老爸", ID 294613559). The mechanism, the rules and every ruling behind them were set by him on a real project. Organising, scrubbing, drawing and committing were done by AI sessions under his command. Questions are welcome on Xiaohongshu.
+
+Released under the MIT licence; see [LICENSE](LICENSE).
