@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>舰队看板</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #1B1F27;
+    --sub: #6B7280;
+    --line: #9AA3B2;
+    --acc: #2563EB;
+    --accbg: #EAF1FF;
+    --lane: #F3F5F9;
+    --bg: #FFFFFF;
+    --ok: #059669;
+    --warn: #D97706;
+    --canvas: #FFFFFF;
+    --stroke: #E3E7EE;
+    --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    --mask: rgba(15, 23, 42, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --ink: #E6EDF3;
+      --sub: #9198A1;
+      --line: #6E7681;
+      --acc: #4493F8;
+      --accbg: #12233D;
+      --lane: #161B22;
+      --bg: #21262D;
+      --ok: #3FB950;
+      --warn: #D29922;
+      --canvas: #0D1117;
+      --stroke: #30363D;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+      --mask: rgba(0, 0, 0, 0.55);
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; max-width: 100%; }
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .titles { min-width: 0; }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; }
+  h2 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--sub);
+  }
+  h3 { margin: 0; font-size: 16px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  p { margin: 0; }
+  .subhead { margin-top: 4px; color: var(--sub); }
+  .problem { color: var(--warn); margin-top: 8px; }
+  button, .card, .row { font: inherit; color: inherit; }
+  button {
+    background: var(--bg);
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  #lang { flex: none; padding: 6px 12px; border-radius: 999px; }
+  button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  section {
+    background: var(--lane);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 14px;
+  }
+  .hint { color: var(--sub); margin: -4px 0 8px; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 12px;
+  }
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+  .card, .row {
+    background: var(--bg);
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 12px 14px 12px 16px;
+    position: relative;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  button.card, button.row { display: block; width: 100%; text-align: left; }
+  button.card:hover, button.row:hover { border-color: var(--acc); }
+  .card::before, .row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--bar, var(--acc));
+  }
+  .card.captain { border: 2px solid var(--acc); }
+  [data-status="施工中"] { --bar: var(--acc); }
+  [data-status="已完成"] { --bar: var(--ok); }
+  [data-status="卡住"],
+  [data-status="已交回执待验收"] { --bar: var(--warn); }
+  [data-status="待开工"] { --bar: var(--line); }
+  .card-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; align-items: baseline; }
+  .role { font-size: 16px; font-weight: 600; min-width: 0; }
+  .mark, .meta, .other { color: var(--sub); }
+  .title { font-weight: 600; margin-top: 6px; }
+  .status { font-weight: 600; }
+  .status[data-status="施工中"] { color: var(--acc); }
+  .status[data-status="已完成"] { color: var(--ok); }
+  .status[data-status="卡住"],
+  .status[data-status="已交回执待验收"] { color: var(--warn); }
+  .status[data-status="待开工"] { color: var(--sub); }
+  .other { margin-top: 6px; }
+  .row-top { font-weight: 600; }
+  #dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: var(--mask);
+  }
+  .sheet {
+    width: min(560px, 100%);
+    max-height: 100%;
+    overflow: auto;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--stroke);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+  }
+  .sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  #dlg-close { flex: none; padding: 6px 12px; }
+  #dlg-path, #dlg-detail, #dlg-label { margin-top: 10px; }
+  pre {
+    margin: 8px 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: 13px/1.45 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    background: var(--lane);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 12px 12px 32px; }
+    h1 { font-size: 22px; }
+    section { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="titles">
+        <h1 data-i18n="舰队看板">舰队看板</h1>
+        <p class="subhead" data-i18n="只看不动。页面每隔几秒自己更新。">只看不动。页面每隔几秒自己更新。</p>
+      </div>
+      <button type="button" id="lang">English</button>
+    </header>
+    <p id="problem" class="problem" hidden></p>
+    <section id="sec-who">
+      <h2 data-i18n="谁在做什么">谁在做什么</h2>
+      <div id="who" class="cards"></div>
+    </section>
+    <section id="sec-ask">
+      <h2 data-i18n="等负责人定的问题">等负责人定的问题</h2>
+      <div id="ask" class="stack"></div>
+    </section>
+    <section id="sec-log">
+      <h2 data-i18n="往来记录">往来记录</h2>
+      <p class="hint" data-i18n="新的在上面">新的在上面</p>
+      <div id="log" class="stack"></div>
+    </section>
+    <section id="sec-win" hidden>
+      <h2 data-i18n="窗口现状">窗口现状</h2>
+      <div id="win" class="cards"></div>
+    </section>
+  </div>
+  <div id="dialog" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+      <div class="sheet-head">
+        <h3 id="dlg-title"></h3>
+        <button type="button" id="dlg-close" data-i18n="关闭">关闭</button>
+      </div>
+      <p id="dlg-task" class="title"></p>
+      <p id="dlg-detail"></p>
+      <p id="dlg-path" class="meta"></p>
+      <p id="dlg-label" class="hint"></p>
+      <pre id="dlg-body"></pre>
+    </div>
+  </div>
+<script>
+(function () {
+  var lang = 'zh';
+  var last = null;
+  var openItem = null;
+  var seen = false;
+  var EN = {
+    '舰队看板': 'Fleet board',
+    '只看不动。页面每隔几秒自己更新。': 'View only. The page refreshes every few seconds.',
+    '谁在做什么': 'who is doing what',
+    '等负责人定的问题': 'questions waiting on the Owner',
+    '往来记录': 'exchanges',
+    '新的在上面': 'newest first',
+    '窗口现状': 'windows',
+    '关闭': 'close',
+    '没有数据': 'no data',
+    '没有待验收的单': 'nothing awaiting acceptance',
+    '待验收': 'awaiting acceptance',
+    '负责人': 'Owner',
+    '没有待定问题': 'no questions waiting on the Owner',
+    '没有往来': 'no exchanges',
+    '卡在': 'waiting on',
+    '等舰长验收': 'awaiting the captain\'s acceptance',
+    '水位': 'context watermark',
+    '刚刚': 'just now',
+    '时间不明': 'time unknown',
+    '路径': 'path',
+    '开头几行': 'opening lines',
+    '已答': 'answered',
+    '正在做': 'working',
+    '空闲': 'idle',
+    '容量满': 'at capacity',
+    '通过': 'pass',
+    '失败': 'fail',
+    '受阻': 'blocked',
+    '待开工': 'pending',
+    '施工中': 'in progress',
+    '已完成': 'done',
+    '已交回执待验收': 'receipt awaiting acceptance',
+    '卡住': 'waiting on a decision',
+    '舰长': 'captain',
+    '舰员甲': 'Crew A',
+    '舰员乙': 'Crew B',
+    '舰员丙': 'Crew C',
+    '舰员丁': 'Crew D',
+    '舰员戊': 'Crew E',
+    '舰员己': 'Crew F',
+    '舰员庚': 'Crew G',
+    '舰员辛': 'Crew H',
+    '舰员壬': 'Crew I',
+    '未指定': 'unassigned',
+    '派出任务书': 'dispatch a task book',
+    '交回执': 'hand in a receipt',
+    '验收': 'acceptance',
+    '提出问题': 'ask the Owner',
+    '答复': 'answer'
+  };
+
+  function tr(zh) {
+    if (zh == null || zh === '') return '';
+    if (lang === 'en') return Object.prototype.hasOwnProperty.call(EN, zh) ? EN[zh] : zh;
+    if (zh === 'Owner') return '负责人';
+    return zh;
+  }
+
+  function shown(item, key) {
+    var alt = item[key + '_en'];
+    if (lang === 'en' && alt) return alt;
+    return item[key] || '';
+  }
+
+  function el(tag, attrs, text) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (key) {
+      if (attrs[key] == null) return;
+      if (key === 'class') node.className = attrs[key];
+      else node.setAttribute(key, attrs[key]);
+    });
+    if (text != null && text !== '') node.textContent = text;
+    return node;
+  }
+
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+  }
+
+  function show(node, text) {
+    if (!text) {
+      node.hidden = true;
+      node.textContent = '';
+      return;
+    }
+    node.hidden = false;
+    node.textContent = text;
+  }
+
+  function applyChrome() {
+    document.documentElement.lang = lang === 'en' ? 'en' : 'zh';
+    document.title = tr('舰队看板');
+    document.querySelectorAll('[data-i18n]').forEach(function (node) {
+      node.textContent = tr(node.getAttribute('data-i18n'));
+    });
+    document.getElementById('lang').textContent = lang === 'en' ? '中文' : 'English';
+  }
+
+  function amount(count, zh, one, many) {
+    if (lang !== 'en') return count + ' ' + zh;
+    return count + ' ' + (count === 1 ? one : many);
+  }
+
+  function formatElapsed(seconds) {
+    if (seconds == null) return tr('时间不明');
+    var sec = Number(seconds);
+    if (!isFinite(sec) || sec < 60) return tr('刚刚');
+    var minutes = Math.round(sec / 60);
+    if (minutes < 60) return amount(minutes, '分钟', 'minute', 'minutes');
+    var hours = Math.round(sec / 3600);
+    if (hours < 48) return amount(hours, '小时', 'hour', 'hours');
+    return amount(Math.round(sec / 86400), '天', 'day', 'days');
+  }
+
+  function formatWhen(epoch) {
+    if (epoch == null) return tr('时间不明');
+    var date = new Date(Number(epoch) * 1000);
+    if (isNaN(date.getTime())) return tr('时间不明');
+    return new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'zh-CN', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    }).format(date);
+  }
+
+  function formatPct(value) {
+    var rounded = Math.round(Number(value) * 10) / 10;
+    if (!isFinite(rounded)) return '';
+    var whole = Math.abs(rounded - Math.round(rounded)) < 0.05;
+    return (whole ? String(Math.round(rounded)) : rounded.toFixed(1)) + '%';
+  }
+
+  function conclusionText(code) {
+    var zh = {PASS: '通过', FAIL: '失败', BLOCKED: '受阻'}[code];
+    return zh ? tr(zh) : '';
+  }
+
+  function kindText(kind) {
+    var zh = {
+      dispatch: '派出任务书',
+      receipt: '交回执',
+      acceptance: '验收',
+      question: '提出问题',
+      answer: '答复'
+    }[kind] || kind;
+    return tr(zh);
+  }
+
+  function stateText(state) {
+    if (state === 'Working') return tr('正在做');
+    return tr(state);
+  }
+
+  function rowLabel(item) {
+    var bits = [item.direction === 'in' ? '←' : '→', kindText(item.kind)];
+    var conclusion = conclusionText(item.conclusion);
+    if (conclusion) bits.push(conclusion);
+    if (item.who) bits.push(tr(item.who));
+    if (item.ref) bits.push(item.ref);
+    return bits.join(' · ');
+  }
+
+  function statusLine(status, seconds, conclusion) {
+    var bits = [tr(status)];
+    var named = conclusionText(conclusion);
+    if (named && status === '已交回执待验收') bits.push(named);
+    if (seconds != null) bits.push(formatElapsed(seconds));
+    return bits.join(' · ');
+  }
+
+  function stuckText(person) {
+    var value = person.stuck_on;
+    if (!value) return '';
+    if (value === '等舰长验收') return tr(value);
+    if (lang === 'en' && person.stuck_on_en) return person.stuck_on_en;
+    return tr('卡在') + (lang === 'en' ? ': ' : '：') + value;
+  }
+
+  function taskList(ids) {
+    return (ids || []).join(lang === 'en' ? ', ' : '、');
+  }
+
+  function note(message) {
+    return el('p', {class: 'hint'}, tr(message));
+  }
+
+  function cardHead(card, person) {
+    var top = el('div', {class: 'card-top'});
+    top.appendChild(el('div', {class: 'role'}, tr(person.role)));
+    if (person.watermark != null) {
+      top.appendChild(el('div', {class: 'mark'}, tr('水位') + ' ' + formatPct(person.watermark)));
+    }
+    card.appendChild(top);
+  }
+
+  function renderCaptain(person) {
+    var awaiting = person.awaiting_ids || [];
+    var card = el('div', {class: 'card captain'});
+    card.setAttribute('data-status', awaiting.length ? '已交回执待验收' : '待开工');
+    cardHead(card, person);
+    card.appendChild(el('div', {class: 'title'}, tr('待验收') + ' ' + awaiting.length));
+    if (awaiting.length) card.appendChild(el('div', {class: 'meta'}, taskList(awaiting)));
+    card.appendChild(el('div', {class: 'title'}, tr('等负责人定的问题') + ' ' + (person.pending_questions || 0)));
+    var asked = person.pending_task_ids || [];
+    if (asked.length) card.appendChild(el('div', {class: 'meta'}, taskList(asked)));
+    return card;
+  }
+
+  function renderPerson(person) {
+    var card = el('div', {class: 'card'});
+    card.setAttribute('data-status', person.task_id ? person.status : '待开工');
+    cardHead(card, person);
+    if (!person.task_id) {
+      card.appendChild(el('div', {class: 'title'}, tr('没有待验收的单')));
+    } else {
+      card.appendChild(el('div', {class: 'meta'}, person.task_id));
+      card.appendChild(el('div', {class: 'title'}, shown(person, 'task_title')));
+      card.appendChild(el('div', {class: 'status', 'data-status': person.status}, statusLine(person.status, person.elapsed_seconds, person.conclusion)));
+      var stuck = stuckText(person);
+      if (stuck) card.appendChild(el('div', {class: 'meta'}, stuck));
+      if (shown(person, 'note')) card.appendChild(el('div', {class: 'meta'}, shown(person, 'note')));
+    }
+    (person.others || []).forEach(function (item) {
+      var line = el('div', {class: 'other'});
+      line.appendChild(el('span', {class: 'status', 'data-status': item.status}, tr(item.status)));
+      line.appendChild(document.createTextNode(' ' + item.id + ' ' + shown(item, 'title')));
+      card.appendChild(line);
+    });
+    return card;
+  }
+
+  function renderQuestion(item) {
+    var button = el('button', {class: 'card', type: 'button'});
+    button.setAttribute('data-status', item.unanswered ? '卡住' : '待开工');
+    button.appendChild(el('div', {class: 'role'}, (item.qid || '') + '  ' + tr(item.who || 'Owner')));
+    button.appendChild(el('div', {class: 'title'}, shown(item, 'question')));
+    var tasks = taskList(item.tasks);
+    if (item.unanswered && tasks) {
+      button.appendChild(el('div', {class: 'meta'}, tr('卡在') + (lang === 'en' ? ': ' : '：') + tasks));
+    }
+    if (item.unanswered && item.elapsed_seconds != null) {
+      button.appendChild(el('div', {class: 'meta'}, formatElapsed(item.elapsed_seconds)));
+    }
+    if (!item.unanswered) {
+      button.appendChild(el('div', {class: 'meta'}, tr('已答') + (lang === 'en' ? ': ' : '：') + (item.answer || '')));
+    }
+    button.addEventListener('click', function () { openDialog(questionDialog(item)); });
+    return button;
+  }
+
+  function questionDialog(item) {
+    var detail = item.body || item.question || '';
+    var detailEn = item.body_en || item.question_en || '';
+    if (item.answer) {
+      detail = detail ? detail + '\n' + item.answer : item.answer;
+      detailEn = detailEn ? detailEn + '\n' + item.answer : item.answer;
+    }
+    return {
+      direction: item.unanswered ? 'out' : 'in',
+      kind: item.unanswered ? 'question' : 'answer',
+      who: item.who,
+      ref: item.qid,
+      title: '',
+      conclusion: '',
+      detail: detail,
+      detail_en: detailEn,
+      path: item.path || '',
+      preview: '',
+      file_missing: !item.path,
+      at: null
+    };
+  }
+
+  function rowStatus(item) {
+    if (item.conclusion === 'FAIL' || item.conclusion === 'BLOCKED' || item.kind === 'question') return '卡住';
+    if (item.conclusion === 'PASS' || item.kind === 'answer') return '已完成';
+    if (item.kind === 'dispatch') return '施工中';
+    return '待开工';
+  }
+
+  function firstLine(value) {
+    if (!value) return '';
+    var lines = String(value).split('\n');
+    for (var i = 0; i < lines.length; i += 1) {
+      if (lines[i].trim()) return lines[i].trim();
+    }
+    return '';
+  }
+
+  function renderExchange(item) {
+    var button = el('button', {class: 'row', type: 'button'});
+    button.setAttribute('data-status', rowStatus(item));
+    button.appendChild(el('div', {class: 'row-top'}, rowLabel(item)));
+    var line = shown(item, 'title') || firstLine(shown(item, 'detail'));
+    if (line) button.appendChild(el('div', {class: 'title'}, line));
+    button.appendChild(el('div', {class: 'meta'}, formatWhen(item.at)));
+    button.addEventListener('click', function () { openDialog(item); });
+    return button;
+  }
+
+  function renderWindow(row) {
+    var status = row.state === 'Working' ? '施工中' : (row.state === '容量满' ? '卡住' : '待开工');
+    var card = el('div', {class: 'card'});
+    card.setAttribute('data-status', status);
+    card.appendChild(el('div', {class: 'role'}, shown(row, 'seat')));
+    var name = lang === 'en' && row.name_en ? row.name_en : tr(row.name);
+    if (name) card.appendChild(el('div', {class: 'title'}, name));
+    var state = lang === 'en' && row.state_en ? row.state_en : stateText(row.state);
+    var bits = [row.model, state].filter(Boolean);
+    if (bits.length) card.appendChild(el('div', {class: 'meta'}, bits.join(' · ')));
+    var clue = lang === 'en' && row.clue_en ? row.clue_en : row.clue;
+    if (clue && clue !== '-') card.appendChild(el('div', {class: 'meta'}, clue));
+    if (row.session) card.appendChild(el('div', {class: 'meta'}, row.session));
+    return card;
+  }
+
+  function fill(node, child) {
+    clear(node);
+    node.appendChild(child);
+  }
+
+  function render(data) {
+    last = data;
+    applyChrome();
+    var who = document.getElementById('who');
+    var ask = document.getElementById('ask');
+    var log = document.getElementById('log');
+    var win = document.getElementById('win');
+    var secWin = document.getElementById('sec-win');
+    clear(who);
+    clear(ask);
+    clear(log);
+    clear(win);
+    if (!data.activator_present) {
+      fill(who, note('没有数据'));
+      fill(ask, note('没有数据'));
+      fill(log, note('没有数据'));
+    } else {
+      if (data.captain) who.appendChild(renderCaptain(data.captain));
+      (data.crew || []).forEach(function (person) { who.appendChild(renderPerson(person)); });
+      if (!data.captain && !(data.crew || []).length) fill(who, note('没有数据'));
+      if (!(data.questions || []).length) fill(ask, note('没有待定问题'));
+      else data.questions.forEach(function (item) { ask.appendChild(renderQuestion(item)); });
+      if (!(data.exchanges || []).length) fill(log, note('没有往来'));
+      else data.exchanges.forEach(function (item) { log.appendChild(renderExchange(item)); });
+    }
+    if (data.windows == null) {
+      secWin.hidden = true;
+    } else {
+      secWin.hidden = false;
+      if (!data.windows.length) fill(win, note('没有数据'));
+      else data.windows.forEach(function (row) { win.appendChild(renderWindow(row)); });
+    }
+    if (openItem) fillDialog(openItem);
+  }
+
+  function fillDialog(item) {
+    openItem = item;
+    document.getElementById('dlg-title').textContent = rowLabel(item);
+    var title = shown(item, 'title');
+    var detail = shown(item, 'detail');
+    if (detail === title) detail = '';
+    var preview = shown(item, 'preview');
+    show(document.getElementById('dlg-task'), title);
+    show(document.getElementById('dlg-detail'), detail);
+    show(document.getElementById('dlg-path'), item.path ? tr('路径') + '  ' + item.path : '');
+    if (item.file_missing) {
+      show(document.getElementById('dlg-label'), '');
+      show(document.getElementById('dlg-body'), tr('没有数据'));
+    } else if (preview) {
+      show(document.getElementById('dlg-label'), tr('开头几行'));
+      show(document.getElementById('dlg-body'), preview);
+    } else {
+      show(document.getElementById('dlg-label'), '');
+      show(document.getElementById('dlg-body'), '');
+    }
+    document.getElementById('dialog').hidden = false;
+  }
+
+  function openDialog(item) {
+    fillDialog(item);
+    document.getElementById('dlg-close').focus();
+  }
+
+  function closeDialog() {
+    openItem = null;
+    document.getElementById('dialog').hidden = true;
+  }
+
+  function setProblem(message) {
+    var node = document.getElementById('problem');
+    if (!message) {
+      node.hidden = true;
+      node.textContent = '';
+      return;
+    }
+    node.hidden = false;
+    node.textContent = tr(message);
+  }
+
+  function refresh() {
+    fetch('/api/board', {cache: 'no-store'}).then(function (res) {
+      if (!res.ok) throw new Error('bad');
+      return res.json();
+    }).then(function (data) {
+      seen = true;
+      setProblem('');
+      render(data);
+    }).catch(function () {
+      if (!seen) {
+        render({activator_present: false, captain: null, crew: [], questions: [], exchanges: [], windows: null});
+      }
+      setProblem('没有数据');
+    });
+  }
+
+  document.getElementById('lang').addEventListener('click', function () {
+    lang = lang === 'en' ? 'zh' : 'en';
+    if (last) render(last);
+    else applyChrome();
+  });
+  document.getElementById('dialog').addEventListener('click', closeDialog);
+  document.querySelector('.sheet').addEventListener('click', function (event) { event.stopPropagation(); });
+  document.getElementById('dlg-close').addEventListener('click', closeDialog);
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') closeDialog();
+  });
+  applyChrome();
+  refresh();
+  setInterval(refresh, 4000);
+})();
+</script>
+</body>
+</html>

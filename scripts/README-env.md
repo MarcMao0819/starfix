@@ -80,6 +80,7 @@ export IM_APP_SECRET="$(cat ~/.secrets/im-app-secret)"   # 推荐
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `ACTIVATOR_STALL_H` | `6` | 任务多少小时无终态算「停滞」，看门狗据此告警 |
+| `FLEET_BOARD_PORT` | `8765` | 舰队看板监听的本机回环端口 |
 
 ## 六、最小可跑示例
 

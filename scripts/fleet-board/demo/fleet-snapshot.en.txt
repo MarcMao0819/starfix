@@ -1,0 +1,6 @@
+# fleet snapshot
+# seat | session | name | model | state | clue
+Window A | seat-captain | captain | model-a | idle | -
+Window B | seat-crew-a | Crew A | model-b | working | tasks/T-A2.md
+Window C | seat-crew-b | Crew B | model-c | idle | -
+Window D | seat-crew-c | Crew C | model-a | at capacity | -

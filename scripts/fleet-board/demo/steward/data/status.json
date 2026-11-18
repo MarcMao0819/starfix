@@ -1,0 +1,11 @@
+{
+  "heartbeat": 1,
+  "pid": 1,
+  "mode": "live",
+  "targets": {
+    "captain": {"role": "舰长", "used_percentage": 28, "phase": "IDLE"},
+    "crew-a": {"role": "舰员甲", "used_percentage": 64, "phase": "IDLE"},
+    "crew-b": {"role": "舰员乙", "used_percentage": 41, "phase": "IDLE"},
+    "crew-c": {"role": "舰员丙", "used_percentage": 12, "phase": "IDLE"}
+  }
+}

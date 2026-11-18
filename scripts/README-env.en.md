@@ -80,6 +80,7 @@ Scripts under `scripts/steward/` and `scripts/recovery/` exit immediately if `FL
 | Variable | Default | Note |
 |---|---|---|
 | `ACTIVATOR_STALL_H` | `6` | How many hours a task may go without a terminal state before it counts as "stalled"; the watchdog alerts on it |
+| `FLEET_BOARD_PORT` | `8765` | Loopback port the fleet board listens on |
 
 ## 6. Minimal runnable example
 

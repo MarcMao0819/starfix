@@ -1,0 +1,209 @@
+{
+  "_说明": "虚构的邻里工具借还小项目，只给看板样例。角色、单号、时间都是占位。",
+  "tasks": [
+    {
+      "id": "T-A1",
+      "title": "借出时必须写下归还日，缺了就整单不收",
+      "title_en": "A check-out must include a return date, or the whole record is refused",
+      "status": "已完成",
+      "owner": "舰员甲",
+      "book": "tasks/T-A1.md",
+      "receipt": "receipts/T-A1.md",
+      "worktree": "",
+      "blocker": "",
+      "note": "缺归还日的三张单都没有写进去",
+      "note_en": "Three records with no return date were not written",
+      "evidence": "验收通过。缺归还日的三张单都没有写进去。",
+      "evidence_en": "Acceptance passed. Three records with no return date were not written.",
+      "created": "<前日> 09:00",
+      "updated": "<日期> 09:40",
+      "history": [
+        ["<前日> 09:00", "待开工", "add"],
+        ["<前日> 10:00", "施工中", "派单 舰员甲"],
+        ["<日期> 09:40", "已完成", "验收通过"]
+      ]
+    },
+    {
+      "id": "T-A2",
+      "title": "超期未还的借出要在清单里标出来",
+      "title_en": "A check-out past its return date is marked on the list",
+      "status": "施工中",
+      "owner": "舰员甲",
+      "book": "tasks/T-A2.md",
+      "receipt": "",
+      "worktree": "",
+      "blocker": "",
+      "note": "正在补一个超期一天的例子",
+      "note_en": "Adding an example that is one day past the return date",
+      "evidence": "",
+      "created": "<日期> 08:20",
+      "updated": "<日期> 10:40",
+      "history": [
+        ["<日期> 08:20", "待开工", "add"],
+        ["<日期> 09:10", "施工中", "派单 舰员甲"]
+      ]
+    },
+    {
+      "id": "T-A3",
+      "title": "首页只留还没归还的借出",
+      "title_en": "The home page lists only check-outs that are not returned",
+      "status": "已完成",
+      "owner": "舰员甲",
+      "book": "tasks/T-A3.md",
+      "receipt": "receipts/T-A3.md",
+      "worktree": "",
+      "blocker": "",
+      "note": "",
+      "evidence": "验收通过。首页只剩还没归还的。",
+      "evidence_en": "Acceptance passed. The home page lists only what is not returned.",
+      "created": "<前日> 14:00",
+      "updated": "<日期> 11:10",
+      "history": [
+        ["<前日> 14:00", "待开工", "add"],
+        ["<前日> 15:00", "施工中", "派单 舰员甲"],
+        ["<日期> 11:10", "已完成", "验收通过"]
+      ]
+    },
+    {
+      "id": "T-B1",
+      "title": "同一个人不能又借出又确认归还",
+      "title_en": "The same person cannot both check out an item and confirm its return",
+      "status": "施工中",
+      "owner": "舰员乙",
+      "book": "tasks/T-B1.md",
+      "receipt": "receipts/T-B1.md",
+      "worktree": "",
+      "blocker": "",
+      "note": "同人确认的例子已经写上",
+      "note_en": "The example of the same person confirming the return is written",
+      "evidence": "",
+      "created": "<日期> 08:00",
+      "updated": "<日期> 10:00",
+      "history": [
+        ["<日期> 08:00", "待开工", "add"],
+        ["<日期> 08:40", "施工中", "派单 舰员乙"]
+      ]
+    },
+    {
+      "id": "T-B2",
+      "title": "损坏时要写明缺了哪个零件",
+      "title_en": "Damage must name the missing part",
+      "status": "施工中",
+      "owner": "舰员乙",
+      "book": "tasks/T-B2.md",
+      "receipt": "receipts/T-B2.md",
+      "worktree": "",
+      "blocker": "",
+      "note": "缺零件的单仍然被收下了",
+      "note_en": "A record that does not name the part was still accepted",
+      "evidence": "",
+      "created": "<日期> 08:15",
+      "updated": "<日期> 10:20",
+      "history": [
+        ["<日期> 08:15", "待开工", "add"],
+        ["<日期> 09:00", "施工中", "派单 舰员乙"]
+      ]
+    },
+    {
+      "id": "T-B3",
+      "title": "把借还记录导出成一张表",
+      "title_en": "Export the check-out records as one table",
+      "status": "施工中",
+      "owner": "舰员乙",
+      "book": "tasks/T-B3.md",
+      "receipt": "receipts/T-B3.md",
+      "worktree": "",
+      "blocker": "等负责人 Q-B：导出的表留哪些列",
+      "blocker_en": "waiting on the Owner, Q-B: which columns the export keeps",
+      "note": "栏目没定，先停着",
+      "note_en": "The columns are not chosen, so this stays paused",
+      "evidence": "",
+      "created": "<日期> 08:30",
+      "updated": "<日期> 09:50",
+      "history": [
+        ["<日期> 08:30", "待开工", "add"],
+        ["<日期> 09:20", "施工中", "派单 舰员乙"]
+      ]
+    },
+    {
+      "id": "T-C1",
+      "title": "清空演练用的借还数据",
+      "title_en": "Clear the drill check-out records",
+      "status": "待开工",
+      "owner": "舰员丙",
+      "book": "tasks/T-C1.md",
+      "receipt": "",
+      "worktree": "",
+      "blocker": "等负责人 Q-A：清空演练数据按单号精确删，还是按前缀一起删",
+      "blocker_en": "waiting on the Owner, Q-A: clear the drill data by exact task ID, or by prefix",
+      "note": "",
+      "evidence": "",
+      "created": "<日期> 08:10",
+      "updated": "<日期> 08:40",
+      "history": [
+        ["<日期> 08:10", "待开工", "add"]
+      ]
+    },
+    {
+      "id": "T-C2",
+      "title": "借出前先看这件东西还在不在架上",
+      "title_en": "Before a check-out, check that the item is still on the shelf",
+      "status": "待开工",
+      "owner": "舰员丙",
+      "book": "tasks/T-C2.md",
+      "receipt": "",
+      "worktree": "",
+      "blocker": "",
+      "note": "",
+      "evidence": "",
+      "created": "<日期> 08:00",
+      "updated": "<日期> 08:00",
+      "history": [
+        ["<日期> 08:00", "待开工", "add"]
+      ]
+    }
+  ],
+  "dropped": [],
+  "decisions": [
+    {
+      "qid": "Q-C",
+      "question": "这两件要不要并进同一次交付？A=分开交付（推荐，删除范围和导出栏目互不影响）B=并成一次交付",
+      "question_en": "Should these two go out in one batch? A = separate batches (recommended: the delete scope and the export columns do not affect each other). B = one batch",
+      "tasks": ["T-C1", "T-B3"],
+      "who": "Owner",
+      "answer": "",
+      "asked_at": "<前日> 11:00",
+      "answered_at": ""
+    },
+    {
+      "qid": "Q-A",
+      "question": "清空演练数据按单号精确删，还是按前缀一起删？A=按单号精确删（推荐，漏了可以再对清单）B=按前缀一起删",
+      "question_en": "Clear the drill data by exact task ID, or by prefix? A = by exact task ID (recommended: anything missed can be checked against the list). B = by prefix",
+      "tasks": ["T-C1"],
+      "who": "Owner",
+      "answer": "",
+      "asked_at": "<日期> 08:10",
+      "answered_at": ""
+    },
+    {
+      "qid": "Q-B",
+      "question": "导出的表留哪些列？A=单号、物品、借出人、应还日（推荐）B=全部字段都导出",
+      "question_en": "Which columns does the export keep? A = task ID, item, borrower, and return date (recommended). B = every field",
+      "tasks": ["T-B3"],
+      "who": "Owner",
+      "answer": "",
+      "asked_at": "<日期> 08:30",
+      "answered_at": ""
+    },
+    {
+      "qid": "Q-D",
+      "question": "归还日空着时整单不收，还是先收再补？A=整单不收（推荐）B=先收再补",
+      "question_en": "If the return date is empty, refuse the whole record, or accept it and fill the date later? A = refuse the whole record (recommended). B = accept it and fill the date later",
+      "tasks": ["T-A1"],
+      "who": "Owner",
+      "answer": "A",
+      "asked_at": "<前日> 09:10",
+      "answered_at": "<前日> 10:00"
+    }
+  ]
+}

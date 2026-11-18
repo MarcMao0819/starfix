@@ -1,0 +1,6 @@
+# 舰队快照
+# 签位 | 会话ID | 会话名 | 模型 | 状态 | 任务线索
+窗甲 | seat-captain | 舰长 | model-a | 空闲 | -
+窗乙 | seat-crew-a | 舰员甲 | model-b | Working | tasks/T-A2.md
+窗丙 | seat-crew-b | 舰员乙 | model-c | 空闲 | -
+窗丁 | seat-crew-c | 舰员丙 | model-a | 容量满 | -
